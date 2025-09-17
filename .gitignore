@@ -7,3 +7,4 @@ outputs/
 .DS_Store
 .ruff_cache/
 .mypy_cache/
+*.egg-info/

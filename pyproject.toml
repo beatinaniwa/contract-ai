@@ -7,7 +7,7 @@ name = "contract-ai-excel-starter"
 version = "0.1.0"
 description = "Streamlit-based AI-assisted contract generator exporting to Excel"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13,<3.14"
 license = {text = "Proprietary"}
 authors = [{name = "Your Team"}]
 dependencies = [
@@ -30,4 +30,4 @@ dev = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"

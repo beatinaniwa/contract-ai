@@ -8,11 +8,11 @@
 ## セットアップ（初回）
 
 ```bash
-# (任意) uv で Python 3.12 を導入
-uv python install 3.12
+# (任意) uv で Python 3.13 を導入
+uv python install 3.13
 
 # 依存を同期（dev ツールも入れる場合は --extra dev を付与）
-uv sync --python 3.12 --extra dev
+uv sync --python 3.13 --extra dev
 ```
 
 > `uv sync` は `uv.lock` が無い場合にロックを生成して解決します。既に `uv.lock` がある場合は

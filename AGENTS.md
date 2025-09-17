@@ -8,7 +8,7 @@
 - Tests belong in `tests/`; mirror module layout so new services gain `tests/test_<module>.py` coverage.
 
 ## Build, Test, and Development Commands
-- `uv sync --python 3.12 --extra dev` installs dependencies and dev tooling into `.venv`.
+- `uv sync --python 3.13 --extra dev` installs dependencies and dev tooling into `.venv`.
 - `uv run streamlit run app/streamlit_app.py` launches the local UI for manual verification.
 - `uv run pytest` executes the suite; append `-k` or `-vv` for focused runs.
 - `uv run ruff check app tests` enforces the configured style; add `uv run ruff format` if formatting becomes part of the workflow.
@@ -17,7 +17,7 @@
 - `uv run mypy app` validates type hints; update stub packages when adding third-party APIs.
 
 ## Coding Style & Naming Conventions
-Use Python 3.12 features with four-space indentation and descriptive snake_case names for modules, functions, and variables. Keep classes in PascalCase and Pydantic models centralized in `schemas.py`. Maintain focused, side-effect-light functions and push integration logic into services. Respect Ruff's 100-character line limit. Document intent in YAML or template updates when structure changes are not self-evident.
+Use Python 3.13 features with four-space indentation and descriptive snake_case names for modules, functions, and variables. Keep classes in PascalCase and Pydantic models centralized in `schemas.py`. Maintain focused, side-effect-light functions and push integration logic into services. Respect Ruff's 100-character line limit. Document intent in YAML or template updates when structure changes are not self-evident.
 
 ## Testing Guidelines
 Pytest is the primary framework. Grow coverage beyond the placeholder by exercising critical services (Excel writer, validator edge cases, extractor fallbacks). Name files `test_<module>.py` and group assertions around user scenarios. Introduce shared fixtures in `tests/conftest.py` as reuse appears. Capture regression cases before modifying mappings or templates. Run `uv run pytest --maxfail=1` before submitting.
