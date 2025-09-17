@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "contract-ai-excel-starter"
+version = "0.1.0"
+description = "Streamlit-based AI-assisted contract generator exporting to Excel"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "Proprietary"}
+authors = [{name = "Your Team"}]
+dependencies = [
+  "streamlit>=1.32.0",
+  "pydantic>=2.6.0",
+  "openpyxl>=3.1.2",
+  "python-dateutil>=2.8.2",
+  "PyYAML>=6.0.1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "ruff>=0.4.0",
+  "mypy>=1.8.0",
+  "pre-commit>=3.7.0",
+  "types-python-dateutil",
+  "types-PyYAML"
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
