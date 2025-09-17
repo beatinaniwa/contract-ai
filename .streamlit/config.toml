@@ -1,0 +1,9 @@
+[client]
+showErrorDetails = true
+
+[server]
+enableXsrfProtection = true
+enableCORS = false
+
+[theme]
+base = "light"

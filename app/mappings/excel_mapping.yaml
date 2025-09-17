@@ -1,0 +1,35 @@
+fields:
+  request_date: { named_range: request_date, format: date }
+  desired_due_date: { named_range: desired_due_date, format: date }
+  requester_department: { named_range: requester_department }
+  requester_manager: { named_range: requester_manager }
+  requester_staff: { named_range: requester_staff }
+
+  project_name: { named_range: project_name }
+  activity_purpose: { named_range: activity_purpose }
+  activity_start: { named_range: activity_start }
+
+  target_item_name: { named_range: target_item_name }
+  deliverables: { named_range: deliverables }
+
+  counterparty_name: { named_range: counterparty_name }
+  counterparty_address: { named_range: counterparty_address }
+  counterparty_type: { named_range: counterparty_type }
+
+  contract_form: { named_range: contract_form }
+  related_contracts: { named_range: related_contracts }
+  contract_category: { named_range: contract_category }
+  procedure: { named_range: procedure }
+  cost_burden: { named_range: cost_burden }
+  restrictions: { named_range: restrictions }
+  notes: { named_range: notes }
+
+  amount_jpy: { named_range: amount_jpy, format: currency_jpy }
+
+  our_activity_summary: { named_range: our_activity_summary }
+  our_productization_summary: { named_range: our_productization_summary }
+  their_activity_summary: { named_range: their_activity_summary }
+  their_productization_summary: { named_range: their_productization_summary }
+
+  received_date: { named_range: received_date, format: date }
+  case_number: { named_range: case_number }
