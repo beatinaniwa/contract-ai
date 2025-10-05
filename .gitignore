@@ -4,6 +4,7 @@ __pycache__/
 outputs/
 .streamlit/*
 !.streamlit/config.toml
+!.streamlit/secrets.example.toml
 .DS_Store
 .ruff_cache/
 .mypy_cache/

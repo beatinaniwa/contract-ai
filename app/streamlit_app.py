@@ -1,5 +1,4 @@
 import os
-import json
 import streamlit as st
 from datetime import date as _dt_date
 from models.schemas import ContractForm
@@ -23,6 +22,10 @@ with st.sidebar:
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
+        if result.get("error"):
+            st.session_state["extract_feedback"] = ("warning", result["error"])
+        else:
+            st.session_state["extract_feedback"] = ("success", "Geminiで抽出結果を取得しました。")
 
     st.divider()
     st.caption("サンプルを読み込む")
@@ -30,7 +33,22 @@ with st.sidebar:
         p = os.path.join(BASE_DIR, "sample_data", "example_input.txt")
         with open(p, "r", encoding="utf-8") as f:
             st.session_state["source_text"] = f.read()
-            st.session_state["extracted"] = extract_contract_form(st.session_state["source_text"])
+            sample_result = extract_contract_form(st.session_state["source_text"])
+            st.session_state["extracted"] = sample_result
+            if sample_result.get("error"):
+                st.session_state["extract_feedback"] = ("warning", sample_result["error"])
+            else:
+                st.session_state["extract_feedback"] = ("success", "サンプルテキストから抽出しました。")
+
+feedback = st.session_state.pop("extract_feedback", None)
+if feedback:
+    status, message = feedback
+    if status == "success":
+        st.success(message)
+    elif status == "error":
+        st.error(message)
+    else:
+        st.warning(message)
 
 def load_vocab():
     p = os.path.join(BASE_DIR, "policies", "vocab.yaml")

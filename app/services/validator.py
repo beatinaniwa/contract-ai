@@ -1,5 +1,5 @@
 from typing import List, Tuple
-from ..models.schemas import ContractForm
+from models.schemas import ContractForm
 
 REQUIRED_FIELDS = [
     "project_name",

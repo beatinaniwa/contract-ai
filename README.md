@@ -36,6 +36,23 @@ uv run streamlit run app/streamlit_app.py
 起動後、左側の「サンプル読込」→「抽出する」→ 右側のフォームで不足を補完 → **「Excel生成」**。
 生成後に **「Excelをダウンロード」** ボタンが表示されます（`outputs/` にも保存）。
 
+## Gemini 設定
+
+抽出処理は Google Gemini 2.5 Pro (`gemini-2.5-pro`) を利用します。Python SDK は
+`google-genai` を採用しているため、`uv sync` 済みの環境で利用してください。API キーは
+プロジェクト内の設定ファイルで管理します。
+
+1. `.streamlit/secrets.example.toml` を `.streamlit/secrets.toml` にコピーします。
+2. `gemini_api_key` に発行したキーを設定します。
+
+```toml
+# .streamlit/secrets.toml
+gemini_api_key = "your-secret"
+```
+
+`.streamlit/secrets.toml` は `.gitignore` 済みです。必要に応じて `STREAMLIT_SECRETS_PATH` 環境変数で読み込むファイルパスを上書きできます。
+Secrets ファイルが存在しない、もしくはキーが空の場合は、従来どおりの簡易正規表現による抽出に自動でフォールバックします。
+
 ---
 
 ## 依存の追加・更新
@@ -57,16 +74,16 @@ uv sync
 ## 主なファイル
 
 - `pyproject.toml` … 依存定義（本番/開発は extras で分離）
+- `.streamlit/secrets.example.toml` … Gemini API キー設定のサンプル
 - `app/templates/request_form_template.xlsx` … 名前付きセルの Excel テンプレート
 - `app/mappings/excel_mapping.yaml` … フィールド→名前付きセルの対応表
 - `app/services/excel_writer.py` … 差し込み処理（openpyxl）
-- `app/services/extractor.py` … 抽出モック（後で LLM/RAG に差し替え）
+- `app/services/extractor.py` … Gemini 2.5 Pro 抽出 + 正規表現フォールバック
 - `app/models/schemas.py` … `ContractForm` の pydantic モデル
 - `outputs/` … 生成ファイル・監査ログの保存先
 
 ---
 
 ## 注意（MVP）
-- 抽出は簡易版（正規表現）。本番では LLM の Structured Output とスキーマ検証を追加してください。
+- Gemini API キー設定時は LLM 抽出、未設定時は正規表現による簡易抽出で動作します。
 - Streamlit の日付項目は未入力ができないため、既定値を日付（今日）にしています。
-
