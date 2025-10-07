@@ -175,31 +175,33 @@ with col_form:
         # 開示される情報
         info_options = vocab.get(
             "disclosed_info_options",
-            ["要求仕様", "関連技術情報", "図面", "サンプル", "その他"],
+            ["要求仕様", "関連技術情報", "図面", "サンプル"],
         )
         info_from_us = st.multiselect(
             "概要_開示される情報_当社から",
             options=info_options,
             default=form_data.get("info_from_us", []),
         )
-        info_from_us_other = ""
-        if "その他" in info_from_us:
-            info_from_us_other = st.text_input(
-                "概要_開示される情報_当社から_その他詳細",
-                value=form_data.get("info_from_us_other", ""),
-            )
+        info_from_us_other = st.text_input(
+            "概要_開示される情報_当社から_その他",
+            value=form_data.get("info_from_us_other", ""),
+            placeholder="他に開示予定があれば記入（空でも可）",
+            help="選択肢にない開示事項があれば1行で記入。未入力可。",
+            key="info_from_us_other",
+        )
 
         info_from_them = st.multiselect(
             "概要_開示される情報_相手から",
             options=info_options,
             default=form_data.get("info_from_them", []),
         )
-        info_from_them_other = ""
-        if "その他" in info_from_them:
-            info_from_them_other = st.text_input(
-                "概要_開示される情報_相手から_その他詳細",
-                value=form_data.get("info_from_them_other", ""),
-            )
+        info_from_them_other = st.text_input(
+            "概要_開示される情報_相手から_その他",
+            value=form_data.get("info_from_them_other", ""),
+            placeholder="他に相手からの開示があれば記入（空でも可）",
+            help="選択肢にない相手からの開示事項があれば1行で記入。未入力可。",
+            key="info_from_them_other",
+        )
 
         our_overall_summary_default = form_data.get("our_overall_summary")
         if not our_overall_summary_default:
@@ -259,9 +261,9 @@ with col_form:
             related_contract_flag=related_contract_flag or None,
             amount_jpy=amount_jpy or None,
             info_from_us=info_from_us,
-            info_from_us_other=info_from_us_other or None,
+            info_from_us_other=info_from_us_other,
             info_from_them=info_from_them,
-            info_from_them_other=info_from_them_other or None,
+            info_from_them_other=info_from_them_other,
             our_overall_summary=our_overall_summary or None,
             their_overall_summary=their_overall_summary or None,
             desired_contract=desired_contract or None,

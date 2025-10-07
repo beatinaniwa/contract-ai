@@ -43,9 +43,9 @@ class ContractForm(BaseModel):
 
     # 開示される情報（複数選択 + その他自由記述）
     info_from_us: List[str] = Field(default_factory=list, title="概要_開示される情報_当社から")
-    info_from_us_other: Optional[str] = Field(None, title="概要_開示される情報_当社から_その他詳細")
+    info_from_us_other: Optional[str] = Field(None, title="概要_開示される情報_当社から_その他")
     info_from_them: List[str] = Field(default_factory=list, title="概要_開示される情報_相手から")
-    info_from_them_other: Optional[str] = Field(None, title="概要_開示される情報_相手から_その他詳細")
+    info_from_them_other: Optional[str] = Field(None, title="概要_開示される情報_相手から_その他")
 
     # どんな契約にしたいか
     desired_contract: Optional[str] = Field(None, title="どんな契約にしたいか")

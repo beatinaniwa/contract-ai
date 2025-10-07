@@ -62,18 +62,11 @@ def write_csv(form_data: Dict[str, Any], mapping_yaml_path: str, out_dir: str = 
         if field.endswith("_date") or field in {"request_date", "desired_due_date", "received_date"}:
             row[header] = _fmt_date(value)
         elif field in {"info_from_us", "info_from_them"}:
-            # Handle multi-select with optional free text for 'その他'
+            # Join selected options only; free-text 'その他' is handled in separate columns
             values: List[str] = list(value) if isinstance(value, (list, tuple)) else [str(value)]
-            joined = _format_list_value(values)
-            if "info_from_us" == field and ("その他" in values):
-                other = str(form_data.get("info_from_us_other", "")).strip()
-                if other:
-                    joined = f"{joined}（その他: {other}）"
-            if "info_from_them" == field and ("その他" in values):
-                other = str(form_data.get("info_from_them_other", "")).strip()
-                if other:
-                    joined = f"{joined}（その他: {other}）"
-            row[header] = joined
+            # Be robust if legacy data mistakenly includes 'その他' in the list
+            filtered = [v for v in values if str(v).strip() and str(v).strip() != "その他"]
+            row[header] = _format_list_value(filtered)
         elif isinstance(value, (list, tuple)):
             row[header] = _format_list_value(value)
         else:
