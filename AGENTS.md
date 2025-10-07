@@ -1,10 +1,10 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app/streamlit_app.py`: Streamlit entrypoint orchestrating extraction, validation, and Excel writing.
-- Services in `app/services/` handle parsing (extractor), normalization, validation, audit logging, and template export.
-- Schema definitions live in `app/models/schemas.py`; update when form fields change and mirror `app/mappings/excel_mapping.yaml`.
-- Static assets: `app/templates/request_form_template.xlsx`, `app/policies/vocab.yaml`, `app/sample_data/example_input.txt`. Runtime exports go to `outputs/` (created at run time).
+- `app/streamlit_app.py`: Streamlit entrypoint orchestrating extraction, validation, and CSV writing.
+- Services in `app/services/` handle parsing (extractor), normalization, validation, audit logging, and CSV export.
+- Schema definitions live in `app/models/schemas.py`; update when form fields change and mirror `app/mappings/csv_mapping.yaml`.
+- Static assets: `app/policies/vocab.yaml`, `app/sample_data/example_input.txt`. Runtime exports go to `outputs/` (created at run time).
 - Tests belong in `tests/`; mirror module layout so new services gain `tests/test_<module>.py` coverage.
 
 ## Build, Test, and Development Commands
@@ -20,7 +20,7 @@
 Use Python 3.13 features with four-space indentation and descriptive snake_case names for modules, functions, and variables. Keep classes in PascalCase and Pydantic models centralized in `schemas.py`. Maintain focused, side-effect-light functions and push integration logic into services. Respect Ruff's 100-character line limit. Document intent in YAML or template updates when structure changes are not self-evident.
 
 ## Testing Guidelines
-Pytest is the primary framework. Grow coverage beyond the placeholder by exercising critical services (Excel writer, validator edge cases, extractor fallbacks). Name files `test_<module>.py` and group assertions around user scenarios. Introduce shared fixtures in `tests/conftest.py` as reuse appears. Capture regression cases before modifying mappings or templates. Run `uv run pytest --maxfail=1` before submitting.
+Pytest is the primary framework. Grow coverage beyond the placeholder by exercising critical services (CSV writer, validator edge cases, extractor fallbacks). Name files `test_<module>.py` and group assertions around user scenarios. Introduce shared fixtures in `tests/conftest.py` as reuse appears. Capture regression cases before modifying mappings or templates. Run `uv run pytest --maxfail=1` before submitting.
 
 ## Continuous Integration (CircleCI)
 - GitHub 上の CircleCI でテストが自動実行されます。
