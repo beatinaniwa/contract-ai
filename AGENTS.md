@@ -42,6 +42,7 @@ With no established history, adopt imperative, present-tense commit subjects sco
   - 例（ドラフト PR）:
     - `gh pr create -B main -H <feature-branch> -t "機能名の追加（概要）" -F PR_BODY.md -d`
   - 例（通常 PR）:
-    - `gh pr create -B main -H <feature-branch> -t "出力項目名の統一と選択式UIの実装" -b "本文..."`
+    - `gh pr create -B main -H <feature-branch> -t "出力項目名の統一と選択式UIの実装" -F PR_BODY.md`
+- PR 本文ファイルはリポジトリ直下の `PR_BODY.md` を毎回利用する。個人編集用のため `.gitignore` に追加済み（コミットしない）。
 - 画面変更がある場合はスクリーンショット/簡易GIFを添付し、レビュアーが確認しやすい状態にする。
 - テスト・lint コマンド（例: `uv run pytest -q`, `uv run ruff check app tests`）を記載し、確認痕跡を残す。
