@@ -8,3 +8,14 @@ counterparty_type:
 contract_form:
   - 当社書式
   - 相手書式
+
+related_contract_flag:
+  - 該当なし
+  - 該当あり
+
+disclosed_info_options:
+  - 要求仕様
+  - 関連技術情報
+  - 図面
+  - サンプル
+  - その他

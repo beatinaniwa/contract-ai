@@ -118,97 +118,163 @@ with col_form:
         request_date = st.date_input(
             "依頼日", value=form_data.get("request_date") or _dt_date.today()
         )
-        desired_due_date = st.date_input(
-            "希望納期", value=form_data.get("desired_due_date") or _dt_date.today()
+        normal_due_date = st.date_input(
+            "通常納期",
+            value=form_data.get("normal_due_date")
+            or form_data.get("desired_due_date")
+            or _dt_date.today(),
         )
         requester_department = st.text_input(
-            "所属", value=form_data.get("requester_department", "")
+            "依頼者_所属", value=form_data.get("requester_department", "")
         )
-        requester_manager = st.text_input("責任者", value=form_data.get("requester_manager", ""))
-        requester_staff = st.text_input("担当者", value=form_data.get("requester_staff", ""))
+        requester_manager = st.text_input(
+            "依頼者_責任者", value=form_data.get("requester_manager", "")
+        )
+        requester_staff = st.text_input(
+            "依頼者_担当者", value=form_data.get("requester_staff", "")
+        )
 
-        project_name = st.text_input("案件名", value=form_data.get("project_name", ""))
+        project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
         activity_purpose = st.text_area(
-            "活動目的", value=form_data.get("activity_purpose", ""), height=80
+            "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
         )
-        activity_start = st.text_input("実活動開始時期", value=form_data.get("activity_start", ""))
+        activity_start = st.text_input(
+            "案件_実活動時期", value=form_data.get("activity_start", "")
+        )
 
-        target_item_name = st.text_input(
-            "契約対象品目 名称", value=form_data.get("target_item_name", "")
+        project_target_item = st.text_input(
+            "案件_契約対象品目",
+            value=form_data.get("project_target_item")
+            or form_data.get("target_item_name", ""),
         )
-        deliverables = st.text_input("引渡物", value=form_data.get("deliverables", ""))
 
         counterparty_name = st.text_input(
-            "相手先名称", value=form_data.get("counterparty_name", "")
+            "契約相手_名称", value=form_data.get("counterparty_name", "")
         )
         counterparty_address = st.text_input(
-            "所在地", value=form_data.get("counterparty_address", "")
+            "契約相手_所在地", value=form_data.get("counterparty_address", "")
         )
-        counterparty_type = st.selectbox("相手区分", options=vocab["counterparty_type"], index=0)
+        counterparty_profile = st.text_area(
+            "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80
+        )
+        counterparty_type = st.selectbox(
+            "概要_相手区分", options=vocab["counterparty_type"], index=0
+        )
 
-        contract_form = st.selectbox("契約書式", options=vocab["contract_form"], index=0)
-        related_contracts = st.text_input("関連契約", value=form_data.get("related_contracts", ""))
-        contract_category = st.text_input("契約種別", value=form_data.get("contract_category", ""))
-        procedure = st.text_input("手続", value=form_data.get("procedure", ""))
-        cost_burden = st.text_input("費用負担", value=form_data.get("cost_burden", ""))
-        restrictions = st.text_input("実施制限", value=form_data.get("restrictions", ""))
-        notes = st.text_area("補足事項", value=form_data.get("notes", ""), height=60)
+        contract_form = st.selectbox(
+            "概要_契約書式", options=vocab["contract_form"], index=0
+        )
+        related_contract_flag = st.selectbox(
+            "概要_関連契約", options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]), index=0
+        )
 
         amount_jpy = st.number_input(
-            "金額（円）", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0))
+            "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0))
         )
 
-        our_activity_summary = st.text_area(
-            "当社の契約活動概要", value=form_data.get("our_activity_summary", ""), height=80
+        # 開示される情報
+        info_options = vocab.get(
+            "disclosed_info_options",
+            ["要求仕様", "関連技術情報", "図面", "サンプル", "その他"],
         )
-        our_productization_summary = st.text_area(
-            "当社の成果事業化概要", value=form_data.get("our_productization_summary", ""), height=80
+        info_from_us = st.multiselect(
+            "概要_開示される情報_当社から",
+            options=info_options,
+            default=form_data.get("info_from_us", []),
         )
-        their_activity_summary = st.text_area(
-            "相手の契約活動概要", value=form_data.get("their_activity_summary", ""), height=80
+        info_from_us_other = ""
+        if "その他" in info_from_us:
+            info_from_us_other = st.text_input(
+                "概要_開示される情報_当社から_その他詳細",
+                value=form_data.get("info_from_us_other", ""),
+            )
+
+        info_from_them = st.multiselect(
+            "概要_開示される情報_相手から",
+            options=info_options,
+            default=form_data.get("info_from_them", []),
         )
-        their_productization_summary = st.text_area(
-            "相手の成果事業化概要",
-            value=form_data.get("their_productization_summary", ""),
-            height=80,
+        info_from_them_other = ""
+        if "その他" in info_from_them:
+            info_from_them_other = st.text_input(
+                "概要_開示される情報_相手から_その他詳細",
+                value=form_data.get("info_from_them_other", ""),
+            )
+
+        our_overall_summary_default = form_data.get("our_overall_summary")
+        if not our_overall_summary_default:
+            # 旧フィールドからの統合
+            parts = [
+                form_data.get("our_activity_summary", "").strip(),
+                form_data.get("our_productization_summary", "").strip(),
+            ]
+            parts = [p for p in parts if p]
+            our_overall_summary_default = "\n".join(parts)
+        our_overall_summary = st.text_area(
+            "概要_当社の契約活動概要および成果事業化概要",
+            value=our_overall_summary_default or "",
+            height=100,
         )
 
-        received_date = st.date_input(
-            "受付日", value=form_data.get("received_date") or _dt_date.today()
+        their_overall_summary_default = form_data.get("their_overall_summary")
+        if not their_overall_summary_default:
+            parts = [
+                form_data.get("their_activity_summary", "").strip(),
+                form_data.get("their_productization_summary", "").strip(),
+            ]
+            parts = [p for p in parts if p]
+            their_overall_summary_default = "\n".join(parts)
+        their_overall_summary = st.text_area(
+            "概要_相手の契約活動概要および成果事業化概要",
+            value=their_overall_summary_default or "",
+            height=100,
         )
-        case_number = st.text_input("案件番号", value=form_data.get("case_number", ""))
+
+        desired_contract = st.text_area(
+            "どんな契約にしたいか", value=form_data.get("desired_contract", ""), height=80
+        )
 
         submitted = st.form_submit_button("CSV出力", type="primary")
 
     if submitted:
+        # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
+        related_contract_flag = related_contract_flag or (
+            "該当あり" if form_data.get("related_contracts") else "該当なし"
+        )
         cf = ContractForm(
             request_date=request_date or None,
-            desired_due_date=desired_due_date or None,
+            normal_due_date=normal_due_date or None,
             requester_department=requester_department or None,
             requester_manager=requester_manager or None,
             requester_staff=requester_staff or None,
             project_name=project_name or None,
             activity_purpose=activity_purpose or None,
             activity_start=activity_start or None,
-            target_item_name=target_item_name or None,
-            deliverables=deliverables or None,
+            project_target_item=project_target_item or None,
             counterparty_name=counterparty_name or None,
             counterparty_address=counterparty_address or None,
+            counterparty_profile=counterparty_profile or None,
             counterparty_type=counterparty_type or None,
             contract_form=contract_form or None,
-            related_contracts=related_contracts or None,
-            contract_category=contract_category or None,
-            procedure=procedure or None,
-            cost_burden=cost_burden or None,
-            restrictions=restrictions or None,
-            notes=notes or None,
+            related_contract_flag=related_contract_flag or None,
             amount_jpy=amount_jpy or None,
-            our_activity_summary=our_activity_summary or None,
-            our_productization_summary=our_productization_summary or None,
-            their_activity_summary=their_activity_summary or None,
-            their_productization_summary=their_productization_summary or None,
-            received_date=received_date or None,
-            case_number=case_number or None,
+            info_from_us=info_from_us,
+            info_from_us_other=info_from_us_other or None,
+            info_from_them=info_from_them,
+            info_from_them_other=info_from_them_other or None,
+            our_overall_summary=our_overall_summary or None,
+            their_overall_summary=their_overall_summary or None,
+            desired_contract=desired_contract or None,
+            # 旧フィールドを残しておく（抽出プレビュー整合のため）
+            desired_due_date=form_data.get("desired_due_date"),
+            target_item_name=form_data.get("target_item_name"),
+            deliverables=form_data.get("deliverables"),
+            our_activity_summary=form_data.get("our_activity_summary"),
+            our_productization_summary=form_data.get("our_productization_summary"),
+            their_activity_summary=form_data.get("their_activity_summary"),
+            their_productization_summary=form_data.get("their_productization_summary"),
+            received_date=form_data.get("received_date"),
+            case_number=form_data.get("case_number"),
             source_text=st.session_state.get("source_text", ""),
         )
         ok, missing = validate_form(cf)

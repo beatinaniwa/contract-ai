@@ -23,7 +23,7 @@ class GeminiConfigError(RuntimeError):
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 FORM_FIELD_NAMES = [name for name in ContractForm.model_fields if name != "source_text"]
-DATE_FIELDS = {"request_date", "desired_due_date", "received_date"}
+DATE_FIELDS = {"request_date", "desired_due_date", "received_date", "normal_due_date"}
 ALLOWED_COUNTERPARTY_TYPES = {
     "民間",
     "大学",
