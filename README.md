@@ -1,4 +1,4 @@
-# 契約書作成アシスタント（Excel出力 / Python + Streamlit）— Starter (uv 版)
+# 契約書作成アシスタント（CSV出力 / Python + Streamlit）— Starter (uv 版)
 
 このリポジトリは、**Astral uv** をフル活用した構成です。`pyproject.toml` に依存を定義し、
 `uv lock` / `uv sync` / `uv run` で再現性の高い環境を素早く構築できます。
@@ -33,8 +33,8 @@ uv run pre-commit run --all-files  # 初回は全ファイルを検査
 uv run streamlit run app/streamlit_app.py
 ```
 
-起動後、左側の「サンプル読込」→「抽出する」→ 右側のフォームで不足を補完 → **「Excel生成」**。
-生成後に **「Excelをダウンロード」** ボタンが表示されます（`outputs/` にも保存）。
+起動後、左側の「サンプル読込」→「抽出する」→ 右側のフォームで不足を補完 → **「CSV出力」**。
+生成後に **「CSVをダウンロード」** ボタンが表示されます（`outputs/` にも保存）。
 
 ## Gemini 設定
 
@@ -75,9 +75,11 @@ uv sync
 
 - `pyproject.toml` … 依存定義（本番/開発は extras で分離）
 - `.streamlit/secrets.example.toml` … Gemini API キー設定のサンプル
-- `app/templates/request_form_template.xlsx` … 名前付きセルの Excel テンプレート
-- `app/mappings/excel_mapping.yaml` … フィールド→名前付きセルの対応表
-- `app/services/excel_writer.py` … 差し込み処理（openpyxl）
+- `app/mappings/csv_mapping.yaml` … CSV のヘッダ並びとマッピング定義（UTF-8 BOM）
+- `app/services/csv_writer.py` … CSV 1行出力ロジック
+- `app/templates/request_form_template.xlsx` … 旧 Excel テンプレート（レガシー）
+- `app/mappings/excel_mapping.yaml` … 旧 Excel 向けマッピング（レガシー）
+- `app/services/excel_writer.py` … 旧 Excel 差し込み処理（レガシー）
 - `app/services/extractor.py` … Gemini 2.5 Pro 抽出 + 正規表現フォールバック
 - `app/models/schemas.py` … `ContractForm` の pydantic モデル
 - `outputs/` … 生成ファイル・監査ログの保存先
