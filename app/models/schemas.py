@@ -14,6 +14,7 @@ class ContractForm(BaseModel):
 
     # 案件
     project_type: Optional[str] = Field(None, title="案件_種別")
+    project_domestic_foreign: Optional[str] = Field(None, title="案件_国内外")
     project_name: Optional[str] = Field(None, title="案件_案件名")
     activity_purpose: Optional[str] = Field(None, title="案件_活動目的")
     activity_start: Optional[str] = Field(None, title="案件_実活動時期")  # 文字列/日付混在に対応

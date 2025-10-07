@@ -7,6 +7,7 @@ headers:
   - 依頼者_担当者
 
   - 案件_種別
+  - 案件_国内外
   - 案件_案件名
   - 案件_活動目的
   - 案件_実活動時期
@@ -42,6 +43,7 @@ fields:
 
   project_name: 案件_案件名
   project_type: 案件_種別
+  project_domestic_foreign: 案件_国内外
   activity_purpose: 案件_活動目的
   activity_start: 案件_実活動時期
   project_target_item: 案件_契約対象品目

@@ -146,6 +146,20 @@ with col_form:
             "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
         )
 
+        # 案件_国内外（2番目）
+        project_domestic_foreign_options = vocab.get("project_domestic_foreign", [])
+        default_pdf = form_data.get("project_domestic_foreign")
+        pdf_index = (
+            project_domestic_foreign_options.index(default_pdf)
+            if default_pdf in project_domestic_foreign_options
+            else 0
+        ) if project_domestic_foreign_options else 0
+        project_domestic_foreign = st.selectbox(
+            "案件_国内外",
+            options=project_domestic_foreign_options or ["国内"],
+            index=pdf_index,
+        )
+
         project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
         activity_purpose = st.text_area(
             "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
@@ -262,6 +276,7 @@ with col_form:
             requester_manager=requester_manager or None,
             requester_staff=requester_staff or None,
             project_type=project_type or None,
+            project_domestic_foreign=project_domestic_foreign or None,
             project_name=project_name or None,
             activity_purpose=activity_purpose or None,
             activity_start=activity_start or None,
