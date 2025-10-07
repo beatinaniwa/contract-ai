@@ -6,6 +6,7 @@ headers:
   - 依頼者_責任者
   - 依頼者_担当者
 
+  - 案件_種別
   - 案件_案件名
   - 案件_活動目的
   - 案件_実活動時期
@@ -40,6 +41,7 @@ fields:
   requester_staff: 依頼者_担当者
 
   project_name: 案件_案件名
+  project_type: 案件_種別
   activity_purpose: 案件_活動目的
   activity_start: 案件_実活動時期
   project_target_item: 案件_契約対象品目

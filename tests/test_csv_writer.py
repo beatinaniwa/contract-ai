@@ -19,6 +19,7 @@ def test_write_csv_creates_file(tmp_path):
         "requester_department": "研究開発部",
         "requester_manager": "山田",
         "requester_staff": "佐藤",
+        "project_type": "NDA",
         "project_name": "自動化装置の開発",
         "activity_purpose": "搬送自動化の試作",
         "activity_start": "2024年10月",

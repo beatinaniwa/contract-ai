@@ -134,6 +134,18 @@ with col_form:
             "依頼者_担当者", value=form_data.get("requester_staff", "")
         )
 
+        # 案件_種別（最初に追加）
+        project_type_options = vocab.get("project_type", [])
+        default_project_type = form_data.get("project_type")
+        project_type_index = (
+            project_type_options.index(default_project_type)
+            if default_project_type in project_type_options
+            else 0
+        ) if project_type_options else 0
+        project_type = st.selectbox(
+            "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
+        )
+
         project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
         activity_purpose = st.text_area(
             "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
@@ -249,6 +261,7 @@ with col_form:
             requester_department=requester_department or None,
             requester_manager=requester_manager or None,
             requester_staff=requester_staff or None,
+            project_type=project_type or None,
             project_name=project_name or None,
             activity_purpose=activity_purpose or None,
             activity_start=activity_start or None,
