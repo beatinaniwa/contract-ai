@@ -46,3 +46,8 @@ With no established history, adopt imperative, present-tense commit subjects sco
 - PR 本文ファイルはリポジトリ直下の `PR_BODY.md` を毎回利用する。個人編集用のため `.gitignore` に追加済み（コミットしない）。
 - 画面変更がある場合はスクリーンショット/簡易GIFを添付し、レビュアーが確認しやすい状態にする。
 - テスト・lint コマンド（例: `uv run pytest -q`, `uv run ruff check app tests`）を記載し、確認痕跡を残す。
+
+#### PR_BODY.md テンプレートの使い方
+- ルートの `PR_BODY.md` はテンプレートです。`<>` のプレースホルダーを置き換え、不要セクションは削除してください。
+- 主なセクション: 概要 / 目的 / 変更内容 / スコープ外 / 影響・互換性 / 動作確認手順 / スクショ / 関連Issue / チェックリスト / リスク・ロールバック / 補足
+- 作成コマンド例: `gh pr create -B main -H <feature-branch> -t "<変更タイトル>" -F PR_BODY.md`
