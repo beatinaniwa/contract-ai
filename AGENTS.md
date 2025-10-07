@@ -51,3 +51,47 @@ With no established history, adopt imperative, present-tense commit subjects sco
 - ルートの `PR_BODY.md` はテンプレートです。`<>` のプレースホルダーを置き換え、不要セクションは削除してください。
 - 主なセクション: 概要 / 目的 / 変更内容 / スコープ外 / 影響・互換性 / 動作確認手順 / スクショ / 関連Issue / チェックリスト / リスク・ロールバック / 補足
 - 作成コマンド例: `gh pr create -B main -H <feature-branch> -t "<変更タイトル>" -F PR_BODY.md`
+
+## GitHub CLI（gh）の使い方
+チーム全体で gh を活用し、同一手順での運用を徹底します。タイトルや本文は「わかりやすい日本語」を心がけてください。
+
+- 初期設定/便利設定
+  - `gh auth login`（GitHub 認証）
+  - `gh config set prompt disabled true`（非対話を好む場合）
+  - 便利エイリアス例: `gh alias set prc 'pr create -B main -t "$(git log -1 --pretty=%s)" -F PR_BODY.md'`
+
+- PR 作成/編集/レビュー
+  - 作成: `gh pr create -B main -H <branch> -t "<タイトル>" -F PR_BODY.md`
+  - 編集: `gh pr edit <番号> -t "<新タイトル>" -F PR_BODY.md`
+  - レビュリクエスト: `gh pr edit <番号> -r user1,user2` / `-a @me` でアサイン
+  - 差分表示: `gh pr diff <番号>` / `gh pr view <番号> -w`（Web）
+  - ステータス/チェック: `gh pr status` / `gh pr checks <番号>`
+  - コメント: `gh pr comment <番号> -b "<コメント>"`
+  - 承認/変更要求: `gh pr review <番号> --approve` / `--request-changes -b "<理由>"`
+  - マージ: `gh pr merge <番号> --squash --delete-branch`（規約に合わせて `--merge`/`--rebase`）
+  - チェックアウト: `gh pr checkout <番号>`（ローカルでレビュー）
+
+- Issue 運用
+  - 作成: `gh issue create -t "<タイトル>" -b "<本文>" -l bug,needs-triage -a @me`
+  - 一覧/検索: `gh issue list -s open -l bug --assignee @me`
+  - 詳細/コメント: `gh issue view <番号>` / `gh issue comment <番号> -b "<コメント>"`
+  - クローズ: `gh issue close <番号> -c "<クローズ理由>"`
+
+- リポジトリ/ナビゲーション
+  - リポ表示/ブラウザ: `gh repo view` / `gh browse`
+  - ファイル/行へ: `gh browse app/streamlit_app.py:42`（GitHub 上の該当行を開く）
+
+- ラベル/メンテナンス
+  - ラベル追加: `gh label create "enhancement" -c "#3FB950" -d "機能追加"`
+  - ラベル付与: `gh issue edit <番号> -l enhancement` / `gh pr edit <番号> -l enhancement`
+
+- リリース（必要時）
+  - 作成: `gh release create v0.1.0 --notes "初回リリース"`
+  - アセット添付: `gh release upload v0.1.0 outputs/*.csv`
+
+- API 高度操作（最終手段）
+  - `gh api repos/:owner/:repo/pulls/<番号>`（REST API で直接参照/更新）
+
+注意
+- 本リポジトリの CI は CircleCI を使用。`gh pr checks` で PR の外部チェック結果を確認可能。GitHub Actions 用の `gh run` は原則未使用。
+- PR 本文は常に `PR_BODY.md` から供給し、わかりやすい日本語で記載。
