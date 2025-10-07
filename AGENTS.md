@@ -22,5 +22,26 @@ Use Python 3.13 features with four-space indentation and descriptive snake_case 
 ## Testing Guidelines
 Pytest is the primary framework. Grow coverage beyond the placeholder by exercising critical services (Excel writer, validator edge cases, extractor fallbacks). Name files `test_<module>.py` and group assertions around user scenarios. Introduce shared fixtures in `tests/conftest.py` as reuse appears. Capture regression cases before modifying mappings or templates. Run `uv run pytest --maxfail=1` before submitting.
 
+## Continuous Integration (CircleCI)
+- GitHub 上の CircleCI でテストが自動実行されます。
+- 実行環境: `cimg/python:3.13`。依存関係は `uv sync --python 3.13 --extra dev` で解決します。
+- CI 実行コマンド（config に準拠）:
+  - テスト: `uv run pytest -q --maxfail=1`
+  - Lint: `uv run ruff check app tests`
+  - 型チェック: `uv run mypy app`
+- キャッシュ: `.venv` と `.uv-cache` を `uv.lock` のチェックサムでキャッシュします。
+- 秘密情報は不要（Gemini はテスト時にスタブ/フォールバック）。必要なら CircleCI 上の Project 設定で環境変数を追加してください。
+
 ## Commit & Pull Request Guidelines
 With no established history, adopt imperative, present-tense commit subjects scoped to the area touched (e.g., `Add audit trail persistence`). Keep feature work separate from formatting-only changes. For pull requests, provide a concise summary, risk notes, and the key commands executed. Link any related issues, and attach Streamlit screenshots or GIFs when UI behavior changes to aid reviewers.
+
+### Pull Request 作成ポリシー（gh CLI）
+- PR のタイトル・説明は、専門用語に偏りすぎない「わかりやすい日本語」で書く。
+- 変更目的 → 主な変更点 → 影響/互換性 → 動作確認手順 → リスク/フォローアップの順で簡潔に整理する。
+- 可能な限り GitHub CLI（`gh`）を用いて PR を作成する。
+  - 例（ドラフト PR）:
+    - `gh pr create -B main -H <feature-branch> -t "機能名の追加（概要）" -F PR_BODY.md -d`
+  - 例（通常 PR）:
+    - `gh pr create -B main -H <feature-branch> -t "出力項目名の統一と選択式UIの実装" -b "本文..."`
+- 画面変更がある場合はスクリーンショット/簡易GIFを添付し、レビュアーが確認しやすい状態にする。
+- テスト・lint コマンド（例: `uv run pytest -q`, `uv run ruff check app tests`）を記載し、確認痕跡を残す。
