@@ -11,6 +11,7 @@ from models.schemas import ContractForm
 from services.audit import save_audit_log
 from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
+from services.extractor import update_contract_sections_with_gemini
 from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
 from services.desired_contract import summarize_desired_contract
@@ -442,29 +443,51 @@ with col_preview:
             source_text = st.session_state.get("source_text", "")
             # Base desired_contract: prefer existing; otherwise auto-summarize from source
             base_dc = form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
-            sections = _parse_sections(base_dc)
 
             our_summary = form_data.get("our_overall_summary", "") or ""
             their_summary = form_data.get("their_overall_summary", "") or ""
 
             remaining_questions: List[str] = []
+            answered_qas: List[Dict[str, str]] = []
             for idx, q in enumerate(follow_up):
                 ans = (answers.get(idx) or "").strip()
                 if not ans:
                     remaining_questions.append(q)
                     continue
-                sec = _map_question_to_section(q)
-                if sec:
-                    sections.setdefault(sec, [])
-                    if ans not in sections[sec]:
-                        sections[sec].append(ans)
-                # Heuristic updates for overall summaries
-                if any(key in ans for key in ("当社", "弊社")):
-                    our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
-                if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
-                    their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
+                answered_qas.append({"question": q, "answer": ans})
 
-            updated_dc = _rebuild_desired_contract(sections)
+            # Default to current values; attempt Gemini-based update first
+            updated_dc = base_dc
+            try:
+                if answered_qas:
+                    updated = update_contract_sections_with_gemini(
+                        source_text=source_text,
+                        current_values={
+                            "desired_contract": base_dc or "",
+                            "our_overall_summary": our_summary or "",
+                            "their_overall_summary": their_summary or "",
+                        },
+                        qa=answered_qas,
+                    )
+                    updated_dc = updated.get("desired_contract", base_dc) or base_dc
+                    our_summary = updated.get("our_overall_summary", our_summary) or our_summary
+                    their_summary = updated.get("their_overall_summary", their_summary) or their_summary
+            except Exception:
+                # Fallback: heuristic merge into sections
+                sections = _parse_sections(base_dc)
+                for qa in answered_qas:
+                    q = qa["question"]
+                    ans = qa["answer"]
+                    sec = _map_question_to_section(q)
+                    if sec:
+                        sections.setdefault(sec, [])
+                        if ans not in sections[sec]:
+                            sections[sec].append(ans)
+                    if any(key in ans for key in ("当社", "弊社")):
+                        our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
+                    if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
+                        their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
+                updated_dc = _rebuild_desired_contract(sections)
             # Write back into extracted payload (session), not into CSV mapping directly
             st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
             st.session_state["extracted"].setdefault("form", {})
