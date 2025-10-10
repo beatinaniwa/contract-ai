@@ -62,3 +62,11 @@ project_domestic_foreign:
   - 海外/中国
   - 海外/欧州
   - 海外/その他
+
+# 案件_契約対象品目の選択肢
+project_target_item:
+  - ハード
+  - ソフト
+  - 技術
+  - 役務
+  - その他

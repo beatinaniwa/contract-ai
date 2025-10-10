@@ -168,10 +168,23 @@ with col_form:
             "案件_実活動時期", value=form_data.get("activity_start", "")
         )
 
-        project_target_item = st.text_input(
-            "案件_契約対象品目",
-            value=form_data.get("project_target_item")
-            or form_data.get("target_item_name", ""),
+        # 契約対象品目（単一選択）
+        project_target_item_options = vocab.get(
+            "project_target_item", ["ハード", "ソフト", "技術", "役務", "その他"]
+        )
+        default_target_raw = (
+            form_data.get("project_target_item") or form_data.get("target_item_name")
+        )
+        if default_target_raw in project_target_item_options:
+            project_target_item_index = project_target_item_options.index(default_target_raw)
+        elif default_target_raw and "その他" in project_target_item_options:
+            project_target_item_index = project_target_item_options.index("その他")
+        else:
+            project_target_item_index = 0
+        project_target_item = st.selectbox(
+            "契約対象品目",
+            options=project_target_item_options,
+            index=project_target_item_index,
         )
 
         counterparty_name = st.text_input(
