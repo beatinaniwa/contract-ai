@@ -5,6 +5,7 @@ from typing import Literal, cast
 
 import streamlit as st
 import yaml
+from typing import List, Dict
 
 from models.schemas import ContractForm
 from services.audit import save_audit_log
@@ -12,6 +13,7 @@ from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
 from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
+from services.desired_contract import summarize_desired_contract
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
@@ -369,5 +371,113 @@ with col_preview:
     follow_up = extracted_payload.get("follow_up_questions") or []
     if follow_up:
         st.subheader("追加で確認したい点 (最大3件)")
-        for q in follow_up:
-            st.write("- ", q)
+        # Render inputs for answers; do not include in CSV
+        answers: Dict[int, str] = {}
+        for idx, q in enumerate(follow_up):
+            st.markdown(f"Q{idx+1}. {q}")
+            ans_key = f"qa_answer_{idx}"
+            answers[idx] = st.text_area(
+                label=f"回答{idx+1}",
+                key=ans_key,
+                height=60,
+                placeholder="（任意）必要十分な記載にするための補足を記入。未入力でも可。",
+            )
+
+        def _map_question_to_section(question: str) -> int | None:
+            # Map known question patterns to desired-contract section numbers (1..4)
+            if "取り扱い方針" in question or "目標は何ですか" in question:
+                return 1
+            if "追加で重視" in question or "ノウハウ帰属" in question:
+                return 2
+            if "実施・許諾の対象と範囲" in question:
+                return 3
+            if "想定リスク" in question or "FTO" in question:
+                return 4
+            return None
+
+        def _parse_sections(dc_text: str) -> Dict[int, List[str]]:
+            """Parse existing desired_contract into sections of bullet lines.
+            Returns {1:[...],2:[...],3:[...],4:[...]}. Creates empty list for missing.
+            """
+            sections: Dict[int, List[str]] = {1: [], 2: [], 3: [], 4: []}
+            if not dc_text:
+                return sections
+            lines = dc_text.splitlines()
+            current = None
+            for ln in lines:
+                if ln.lstrip().startswith("1."):
+                    current = 1
+                    continue
+                if ln.lstrip().startswith("2."):
+                    current = 2
+                    continue
+                if ln.lstrip().startswith("3."):
+                    current = 3
+                    continue
+                if ln.lstrip().startswith("4."):
+                    current = 4
+                    continue
+                if current and ln.lstrip().startswith("-"):
+                    sections[current].append(ln.lstrip()[1:].strip())
+            return sections
+
+        def _rebuild_desired_contract(sections: Dict[int, List[str]]) -> str:
+            titles = {
+                1: "1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
+                2: "2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
+                3: "3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）",
+                4: "4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）",
+            }
+            chunks: List[str] = []
+            for i in (1, 2, 3, 4):
+                bullets = sections.get(i, [])
+                if not bullets:
+                    bullets = ["記載なし"]
+                chunk = titles[i] + "\n- " + "\n- ".join(bullets)
+                chunks.append(chunk)
+            return "\n\n".join(chunks)
+
+        if st.button("回答を送信", type="secondary", use_container_width=True):
+            form_data = extracted_payload.get("form", {})
+            source_text = st.session_state.get("source_text", "")
+            # Base desired_contract: prefer existing; otherwise auto-summarize from source
+            base_dc = form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
+            sections = _parse_sections(base_dc)
+
+            our_summary = form_data.get("our_overall_summary", "") or ""
+            their_summary = form_data.get("their_overall_summary", "") or ""
+
+            remaining_questions: List[str] = []
+            for idx, q in enumerate(follow_up):
+                ans = (answers.get(idx) or "").strip()
+                if not ans:
+                    remaining_questions.append(q)
+                    continue
+                sec = _map_question_to_section(q)
+                if sec:
+                    sections.setdefault(sec, [])
+                    if ans not in sections[sec]:
+                        sections[sec].append(ans)
+                # Heuristic updates for overall summaries
+                if any(key in ans for key in ("当社", "弊社")):
+                    our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
+                if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
+                    their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
+
+            updated_dc = _rebuild_desired_contract(sections)
+            # Write back into extracted payload (session), not into CSV mapping directly
+            st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
+            st.session_state["extracted"].setdefault("form", {})
+            st.session_state["extracted"]["form"]["desired_contract"] = updated_dc
+            if our_summary:
+                st.session_state["extracted"]["form"]["our_overall_summary"] = our_summary
+            if their_summary:
+                st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
+
+            # Keep only unanswered questions
+            if remaining_questions:
+                st.session_state["extracted"]["follow_up_questions"] = remaining_questions
+            else:
+                st.session_state["extracted"].pop("follow_up_questions", None)
+
+            st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
