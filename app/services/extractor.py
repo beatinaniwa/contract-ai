@@ -121,7 +121,12 @@ UPDATE_PROMPT_TEMPLATE = """
 {
   "desired_contract": string,
   "our_overall_summary": string,
-  "their_overall_summary": string
+  "their_overall_summary": string,
+  "explanation": {
+    "desired_contract": {"action": "updated" | "unchanged", "reason": string},
+    "our_overall_summary": {"action": "updated" | "unchanged", "reason": string},
+    "their_overall_summary": {"action": "updated" | "unchanged", "reason": string}
+  }
 }
 
 source_text:
@@ -395,17 +400,37 @@ def update_contract_sections_with_gemini(
     if not content:
         raise ValueError("Gemini response was empty")
     parsed = _load_json(content)
-    out = {
-        "desired_contract": str(
-            parsed.get("desired_contract", current_values.get("desired_contract", "") or "")
-        ),
-        "our_overall_summary": str(
-            parsed.get("our_overall_summary", current_values.get("our_overall_summary", "") or "")
-        ),
-        "their_overall_summary": str(
-            parsed.get(
-                "their_overall_summary", current_values.get("their_overall_summary", "") or ""
-            )
-        ),
+    before_dc = current_values.get("desired_contract", "") or ""
+    before_our = current_values.get("our_overall_summary", "") or ""
+    before_their = current_values.get("their_overall_summary", "") or ""
+
+    dc = str(parsed.get("desired_contract", before_dc))
+    our = str(parsed.get("our_overall_summary", before_our))
+    their = str(parsed.get("their_overall_summary", before_their))
+
+    explanation = parsed.get("explanation")
+    if not isinstance(explanation, dict):
+        # Build a minimal explanation from diffs if model didn't provide one
+        explanation = {}
+        explanation["desired_contract"] = {
+            "action": "updated" if dc != before_dc else "unchanged",
+            "reason": "回答に基づき内容を更新" if dc != before_dc else "既存の内容が必要十分のため変更なし",
+        }
+        explanation["our_overall_summary"] = {
+            "action": "updated" if our != before_our else "unchanged",
+            "reason": "回答を反映して追記/修正" if our != before_our else "回答により変更不要",
+        }
+        explanation["their_overall_summary"] = {
+            "action": "updated" if their != before_their else "unchanged",
+            "reason": "回答を反映して追記/修正" if their != before_their else "回答により変更不要",
+        }
+
+    out: Dict[str, str] = {
+        "desired_contract": dc,
+        "our_overall_summary": our,
+        "their_overall_summary": their,
     }
-    return out
+    # Attach explanation for UI consumption
+    out_with_expl: Dict[str, str] = dict(out)
+    out_with_expl["explanation"] = explanation  # type: ignore[assignment]
+    return out_with_expl

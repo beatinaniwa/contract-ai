@@ -458,6 +458,7 @@ with col_preview:
 
             # Default to current values; attempt Gemini-based update first
             updated_dc = base_dc
+            explanation_for_ui: Dict[str, Dict[str, str]] | None = None
             try:
                 if answered_qas:
                     updated = update_contract_sections_with_gemini(
@@ -472,6 +473,9 @@ with col_preview:
                     updated_dc = updated.get("desired_contract", base_dc) or base_dc
                     our_summary = updated.get("our_overall_summary", our_summary) or our_summary
                     their_summary = updated.get("their_overall_summary", their_summary) or their_summary
+                    maybe_expl = updated.get("explanation")
+                    if isinstance(maybe_expl, dict):
+                        explanation_for_ui = maybe_expl  # type: ignore[assignment]
             except Exception:
                 # Fallback: heuristic merge into sections
                 sections = _parse_sections(base_dc)
@@ -488,6 +492,22 @@ with col_preview:
                     if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
                         their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
                 updated_dc = _rebuild_desired_contract(sections)
+                explanation_for_ui = {
+                    "desired_contract": {
+                        "action": "updated" if updated_dc != base_dc else "unchanged",
+                        "reason": "回答内容を章別に追記（Gemini未使用のフォールバック）"
+                        if updated_dc != base_dc
+                        else "回答が空または変更不要のため維持（Gemini未使用のフォールバック）",
+                    },
+                    "our_overall_summary": {
+                        "action": "updated" if form_data.get("our_overall_summary", "") != our_summary else "unchanged",
+                        "reason": "回答（当社/弊社を含む）を反映" if form_data.get("our_overall_summary", "") != our_summary else "変更不要",
+                    },
+                    "their_overall_summary": {
+                        "action": "updated" if form_data.get("their_overall_summary", "") != their_summary else "unchanged",
+                        "reason": "回答（相手/先方 等）を反映" if form_data.get("their_overall_summary", "") != their_summary else "変更不要",
+                    },
+                }
             # Write back into extracted payload (session), not into CSV mapping directly
             st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
             st.session_state["extracted"].setdefault("form", {})
@@ -504,3 +524,34 @@ with col_preview:
                 st.session_state["extracted"].pop("follow_up_questions", None)
 
             st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
+
+            # Store explanation for UI
+            if explanation_for_ui is not None:
+                st.session_state["qa_update_explanation"] = explanation_for_ui
+                st.session_state["qa_update_engine"] = "gemini"
+            else:
+                st.session_state["qa_update_explanation"] = st.session_state.get(
+                    "qa_update_explanation", {}
+                )
+                st.session_state["qa_update_engine"] = "fallback"
+
+    # Show last update explanation (if exists)
+    expl = st.session_state.get("qa_update_explanation")
+    if expl:
+        engine = st.session_state.get("qa_update_engine", "gemini")
+        st.subheader("回答反映の判断結果")
+        if engine == "gemini":
+            st.caption("Gemini 2.5 Pro による更新判断")
+        else:
+            st.caption("Gemini未使用のフォールバックによる更新判断")
+
+        def _render_line(label: str, key: str):
+            info = expl.get(key, {}) if isinstance(expl, dict) else {}
+            action = info.get("action", "unknown")
+            reason = info.get("reason", "")
+            status = "更新" if action == "updated" else "変更なし" if action == "unchanged" else "不明"
+            st.write(f"- {label}: {status} — {reason}")
+
+        _render_line("どんな契約にしたいか", "desired_contract")
+        _render_line("概要_当社の契約活動概要および成果事業化概要", "our_overall_summary")
+        _render_line("概要_相手の契約活動概要および成果事業化概要", "their_overall_summary")
