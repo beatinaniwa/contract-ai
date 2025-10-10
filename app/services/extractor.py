@@ -3,7 +3,7 @@ import logging
 import os
 import re
 from functools import lru_cache
-from typing import Any, Dict
+from typing import Any, Dict, Sequence, cast
 
 from google import genai
 from dateutil import parser
@@ -23,7 +23,7 @@ class GeminiConfigError(RuntimeError):
 
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 FORM_FIELD_NAMES = [name for name in ContractForm.model_fields if name != "source_text"]
-DATE_FIELDS = {"request_date", "desired_due_date", "received_date"}
+DATE_FIELDS = {"request_date", "desired_due_date", "received_date", "normal_due_date"}
 ALLOWED_COUNTERPARTY_TYPES = {
     "民間",
     "大学",
@@ -199,7 +199,10 @@ def _coerce_form(raw_form: Dict[str, Any]) -> ContractForm:
         return ContractForm(**cleaned)
     except ValidationError as exc:
         for error in exc.errors():
-            loc = error.get("loc") or []
+            raw_loc = error.get("loc")
+            loc: Sequence[object] = (
+                cast(Sequence[object], raw_loc) if isinstance(raw_loc, (list, tuple)) else []
+            )
             field = loc[0] if loc else None
             if isinstance(field, str):
                 cleaned.pop(field, None)
@@ -280,9 +283,7 @@ def _get_api_key() -> str:
         raise GeminiConfigError(str(exc)) from exc
 
     if not api_key:
-        raise GeminiConfigError(
-            ".streamlit/secrets.toml に gemini_api_key を設定してください。"
-        )
+        raise GeminiConfigError(".streamlit/secrets.toml に gemini_api_key を設定してください。")
 
     return api_key
 

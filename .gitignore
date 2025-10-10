@@ -9,3 +9,4 @@ outputs/
 .ruff_cache/
 .mypy_cache/
 *.egg-info/
+PR_BODY.md

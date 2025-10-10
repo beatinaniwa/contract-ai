@@ -1,0 +1,60 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/python:3.13
+    environment:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      UV_LINK_MODE: copy
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-uv-cache-{{ checksum "uv.lock" }}
+            - v1-uv-cache-
+
+      - run:
+          name: Install uv
+          command: |
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$BASH_ENV"
+            source "$BASH_ENV"
+            uv --version
+
+      - run:
+          name: Sync dependencies (dev extras) with uv
+          command: |
+            source "$BASH_ENV"
+            uv sync --python 3.13 --extra dev
+
+      - save_cache:
+          key: v1-uv-cache-{{ checksum "uv.lock" }}
+          paths:
+            - .venv
+            - .uv-cache
+
+      - run:
+          name: Run tests
+          command: |
+            source "$BASH_ENV"
+            uv run pytest -q --maxfail=1
+
+      - run:
+          name: Lint (ruff)
+          command: |
+            source "$BASH_ENV"
+            uv run ruff check app tests
+
+      - run:
+          name: Type check (mypy)
+          command: |
+            source "$BASH_ENV"
+            uv run mypy app
+
+workflows:
+  ci:
+    jobs:
+      - test
+

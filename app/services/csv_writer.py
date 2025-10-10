@@ -26,14 +26,17 @@ def _init_row(headers: List[str]) -> Dict[str, Any]:
     return row
 
 
-def _set_checkbox(row: Dict[str, Any], mapping: Dict[str, str], selected: str | None) -> None:
-    """Populate 1/0 values for a checkbox group.
+def _format_list_value(values: Any) -> str:
+    """Join list-like values with '、'. Convert non-lists to str.
 
-    mapping: { option_label -> column_header }
-    selected: currently selected label (or None)
+    Examples:
+      ["要求仕様", "図面"] -> "要求仕様、図面"
     """
-    for option, col in mapping.items():
-        row[col] = 1 if (selected == option) else 0
+    if values is None:
+        return ""
+    if isinstance(values, (list, tuple)):
+        return "、".join(str(v) for v in values if str(v).strip())
+    return str(values)
 
 
 def write_csv(form_data: Dict[str, Any], mapping_yaml_path: str, out_dir: str = "outputs") -> str:
@@ -58,25 +61,16 @@ def write_csv(form_data: Dict[str, Any], mapping_yaml_path: str, out_dir: str = 
             continue
         if field.endswith("_date") or field in {"request_date", "desired_due_date", "received_date"}:
             row[header] = _fmt_date(value)
+        elif field in {"info_from_us", "info_from_them"}:
+            # Join selected options only; free-text 'その他' is handled in separate columns
+            values: List[str] = list(value) if isinstance(value, (list, tuple)) else [str(value)]
+            # Be robust if legacy data mistakenly includes 'その他' in the list
+            filtered = [v for v in values if str(v).strip() and str(v).strip() != "その他"]
+            row[header] = _format_list_value(filtered)
+        elif isinstance(value, (list, tuple)):
+            row[header] = _format_list_value(value)
         else:
             row[header] = value
-
-    # 2) Counterparty (1社目のみアプリの入力から埋める)
-    row[cfg["counterparty"]["name_cols"][0]] = form_data.get("counterparty_name", "")
-    row[cfg["counterparty"]["addr_cols"][0]] = form_data.get("counterparty_address", "")
-
-    # 相手区分チェックボックス (1社目)
-    cp_types_map: Dict[str, str] = cfg["counterparty"]["type_cols"][0]
-    _set_checkbox(row, cp_types_map, form_data.get("counterparty_type"))
-
-    # 2社目/3社目は空のまま。チェックボックスは0で初期化
-    for idx in (1, 2):
-        for _, col in cfg["counterparty"]["type_cols"][idx].items():
-            row[col] = 0
-
-    # 3) 契約書式チェックボックス
-    contract_form_cols: Dict[str, str] = cfg.get("contract_form_cols", {})
-    _set_checkbox(row, contract_form_cols, form_data.get("contract_form"))
 
     # 出力
     os.makedirs(out_dir, exist_ok=True)
@@ -88,4 +82,3 @@ def write_csv(form_data: Dict[str, Any], mapping_yaml_path: str, out_dir: str = 
         writer.writeheader()
         writer.writerow(row)
     return out_path
-

@@ -77,9 +77,6 @@ uv sync
 - `.streamlit/secrets.example.toml` … Gemini API キー設定のサンプル
 - `app/mappings/csv_mapping.yaml` … CSV のヘッダ並びとマッピング定義（UTF-8 BOM）
 - `app/services/csv_writer.py` … CSV 1行出力ロジック
-- `app/templates/request_form_template.xlsx` … 旧 Excel テンプレート（レガシー）
-- `app/mappings/excel_mapping.yaml` … 旧 Excel 向けマッピング（レガシー）
-- `app/services/excel_writer.py` … 旧 Excel 差し込み処理（レガシー）
 - `app/services/extractor.py` … Gemini 2.5 Pro 抽出 + 正規表現フォールバック
 - `app/models/schemas.py` … `ContractForm` の pydantic モデル
 - `outputs/` … 生成ファイル・監査ログの保存先
