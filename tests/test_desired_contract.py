@@ -5,7 +5,7 @@ APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-from services.desired_contract import summarize_desired_contract
+from services.desired_contract import summarize_desired_contract  # noqa: E402
 
 
 def test_summarize_desired_contract_extracts_facts_and_questions():
@@ -40,4 +40,3 @@ def test_summarize_desired_contract_questions_when_empty():
     assert "3. 上記2." in summary
     assert "4. 上記1." in summary
     assert 1 <= len(questions) <= 3
-

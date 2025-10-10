@@ -7,7 +7,7 @@ APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-from services.csv_writer import write_csv
+from services.csv_writer import write_csv  # noqa: E402
 
 
 def test_write_csv_creates_file(tmp_path):
