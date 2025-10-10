@@ -351,3 +351,11 @@ with col_preview:
 
     st.subheader("CSVマッピング")
     st.write("マッピング: ", os.path.relpath(MAPPING))
+
+    # Follow-up questions to ask user (if any)
+    extracted_payload = st.session_state.get("extracted", {})
+    follow_up = extracted_payload.get("follow_up_questions") or []
+    if follow_up:
+        st.subheader("追加で確認したい点 (最大3件)")
+        for q in follow_up:
+            st.write("- ", q)

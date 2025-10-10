@@ -13,6 +13,7 @@ from models.schemas import ContractForm
 from config_loader import ConfigNotFoundError, load_secret
 from .normalizer import normalize_amount_jpy
 from .validator import validate_form
+from .desired_contract import summarize_desired_contract
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ PROMPT_TEMPLATE = """
 あなたは日本語の打ち合わせメモから契約申請フォームの情報を抽出するアシスタントです。
 出力はJSONのみで、余分な文章やマークダウンを含めないでください。
 全てのキーを含む "form" オブジェクトを生成し、値が不明な場合は null を設定します。
+
+加えて、最後の項目「どんな契約にしたいか」を次の4観点で事実のみから構成してください（推測禁止）。
+不足がある場合は、ユーザが答えやすいフォローアップ質問を最大3つまで "follow_up_questions" に配列で出力してください。
 
 必須のJSON構造:
 {{
@@ -66,8 +70,10 @@ PROMPT_TEMPLATE = """
     "their_activity_summary": 文字列または null,
     "their_productization_summary": 文字列または null,
     "received_date": "YYYY-MM-DD" または null,
-    "case_number": 文字列または null
-  }}
+    "case_number": 文字列または null,
+    "desired_contract": 文字列または null
+  }},
+  "follow_up_questions": 配列（0〜3件の日本語の短い質問）
 }}
 
 制約:
@@ -77,6 +83,12 @@ PROMPT_TEMPLATE = """
 - "contract_form" は ["当社書式","相手書式"] のいずれか。
 - 箇条書きなど複数の記述は文脈を保った文字列にまとめてください。
 - 不明な情報を推測せず、見つからない場合は null としてください。
+
+「どんな契約にしたいか」の記述形式（必須）:
+1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）\n- <事実の箇条書き>
+2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）\n- <事実の箇条書き>
+3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）\n- <事実の箇条書き>
+4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）\n- <事実の箇条書き>
 
 入力テキスト:
 {conversation}
@@ -126,8 +138,22 @@ def _extract_with_gemini(text: str) -> Dict[str, Any]:
         raise ValueError("Gemini response did not include a valid 'form' object")
 
     form = _coerce_form(raw_form)
+    out_form = form.model_dump(exclude_none=True)
+
+    # Fill desired_contract if missing, and compute questions from source text
+    desired_text, questions = summarize_desired_contract(text)
+    if not out_form.get("desired_contract") and desired_text.strip():
+        out_form["desired_contract"] = desired_text
+
     _, missing = validate_form(form)
-    return {"form": form.model_dump(exclude_none=True), "missing_fields": missing}
+    result: Dict[str, Any] = {"form": out_form, "missing_fields": missing}
+    if isinstance(payload.get("follow_up_questions"), list) and payload.get(
+        "follow_up_questions"
+    ):
+        result["follow_up_questions"] = payload["follow_up_questions"]
+    elif questions:
+        result["follow_up_questions"] = questions
+    return result
 
 
 def _extract_with_regex(text: str) -> Dict[str, Any]:
@@ -189,8 +215,17 @@ def _extract_with_regex(text: str) -> Dict[str, Any]:
         data["case_number"] = case_number.group(1).strip()
 
     form = _coerce_form(data)
+    out_form = form.model_dump(exclude_none=True)
+
+    desired_text, questions = summarize_desired_contract(source)
+    if desired_text.strip():
+        out_form["desired_contract"] = desired_text
+
     _, missing = validate_form(form)
-    return {"form": form.model_dump(exclude_none=True), "missing_fields": missing}
+    result: Dict[str, Any] = {"form": out_form, "missing_fields": missing}
+    if questions:
+        result["follow_up_questions"] = questions
+    return result
 
 
 def _coerce_form(raw_form: Dict[str, Any]) -> ContractForm:
