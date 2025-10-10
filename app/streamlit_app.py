@@ -1,6 +1,7 @@
 import hashlib
 import os
 from datetime import date as _dt_date
+from typing import Literal, cast
 
 import streamlit as st
 import yaml
@@ -279,8 +280,13 @@ with col_form:
 
     if submitted:
         # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
-        related_contract_flag = related_contract_flag or (
+        raw_related_flag = related_contract_flag or (
             "該当あり" if form_data.get("related_contracts") else "該当なし"
+        )
+        if raw_related_flag not in ("該当なし", "該当あり"):
+            raw_related_flag = "該当なし"
+        related_flag: Literal["該当なし", "該当あり"] = cast(
+            Literal["該当なし", "該当あり"], raw_related_flag
         )
         cf = ContractForm(
             request_date=request_date or None,
@@ -299,7 +305,7 @@ with col_form:
             counterparty_profile=counterparty_profile or None,
             counterparty_type=counterparty_type or None,
             contract_form=contract_form or None,
-            related_contract_flag=related_contract_flag or None,
+            related_contract_flag=related_flag,
             amount_jpy=amount_jpy or None,
             info_from_us=info_from_us,
             info_from_us_other=info_from_us_other,
@@ -308,6 +314,12 @@ with col_form:
             our_overall_summary=our_overall_summary or None,
             their_overall_summary=their_overall_summary or None,
             desired_contract=desired_contract or None,
+            # 自由記述系（抽出済みの既存値があれば保持）
+            contract_category=form_data.get("contract_category"),
+            procedure=form_data.get("procedure"),
+            cost_burden=form_data.get("cost_burden"),
+            restrictions=form_data.get("restrictions"),
+            notes=form_data.get("notes"),
             # 旧フィールドを残しておく（抽出プレビュー整合のため）
             desired_due_date=form_data.get("desired_due_date"),
             target_item_name=form_data.get("target_item_name"),
