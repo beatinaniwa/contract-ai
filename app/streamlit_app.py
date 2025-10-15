@@ -427,11 +427,21 @@ with col_main:
         )
         ok, missing = validate_form(cf)
         if not ok:
-            st.error(f"必須項目が未入力です: {', '.join(missing)}")
-        else:
-            out_path = write_csv(
-                cf.model_dump(), MAPPING, out_dir=os.path.join(os.getcwd(), "outputs")
-            )
+            def _to_japanese_labels(keys: list[str]) -> list[str]:
+                try:
+                    with open(MAPPING, "r", encoding="utf-8") as f_yaml:
+                        mapping = yaml.safe_load(f_yaml) or {}
+                    field_map = mapping.get("fields", {}) if isinstance(mapping, dict) else {}
+                    return [field_map.get(k, k) for k in keys]
+                except Exception:
+                    return keys
+
+            labels = _to_japanese_labels(missing)
+            st.error(f"必須項目が未入力です: {', '.join(labels)}")
+            else:
+                out_path = write_csv(
+                    cf.model_dump(), MAPPING, out_dir=os.path.join(os.getcwd(), "outputs")
+                )
             st.success("CSVを生成しました。")
             with open(out_path, "rb") as f_bin:
                 st.download_button(
