@@ -702,8 +702,9 @@ with col_main:
                 st.session_state["qa_round"] = 0  # リセット
 
             # 反映の要約（Gemini吟味 or フォールバック）
-            eng = st.session_state.get("qa_update_engine", "gemini")
-            engine_label = "Gemini 2.5 Pro" if eng == "gemini" else "Gemini未使用のフォールバック"
+            engine_label = (
+                "Gemini 2.5 Pro" if explanation_for_ui is not None else "Gemini未使用のフォールバック"
+            )
             def _stat_line(lbl: str, key: str) -> str:
                 info = (explanation_for_ui or {}).get(key, {}) if isinstance(explanation_for_ui, dict) else {}
                 action = info.get("action")
