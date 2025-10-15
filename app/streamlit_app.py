@@ -77,10 +77,32 @@ with col_right:
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
         st.session_state["qa_round"] = 0
+
+        # 3欄のウィジェットキーへも反映（次の rerun の先頭で適用）
+        form_preview = result.get("form", {}) if isinstance(result, dict) else {}
+        dc_val = form_preview.get("desired_contract")
+        our_val = form_preview.get("our_overall_summary")
+        their_val = form_preview.get("their_overall_summary")
+        updates = {}
+        if dc_val is not None:
+            updates["desired_contract_widget"] = str(dc_val)
+        if our_val is not None:
+            updates["our_overall_summary_widget"] = str(our_val)
+        if their_val is not None:
+            updates["their_overall_summary_widget"] = str(their_val)
+        if updates:
+            st.session_state["pending_widget_updates"] = updates
+
         if result.get("error"):
             st.session_state["extract_feedback"] = ("warning", result["error"])
         else:
             st.session_state["extract_feedback"] = ("success", "Geminiで抽出結果を取得しました。")
+
+        # UIを更新して、左側フォームに即時反映
+        try:
+            getattr(st, "rerun")()
+        except Exception:
+            st.experimental_rerun()
 
 
 feedback = st.session_state.pop("extract_feedback", None)
@@ -376,6 +398,17 @@ with col_main:
                     continue
             out_lines.append(ln)
         return "\n".join(out_lines)
+
+    # 右カラムのAI反映で raw 文字列が入った場合でも、表示前にタイトルを簡略化
+    try:
+        if "desired_contract_widget" in st.session_state and isinstance(
+            st.session_state.get("desired_contract_widget"), str
+        ):
+            st.session_state["desired_contract_widget"] = _strip_desired_titles(
+                st.session_state.get("desired_contract_widget", "")
+            )
+    except Exception:
+        pass
 
     desired_contract_default = (form_data.get("desired_contract", "") or "").strip()
     if desired_contract_default:
