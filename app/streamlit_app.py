@@ -28,13 +28,27 @@ if "source_text_widget" not in st.session_state:
 
 st.session_state.setdefault("uploaded_file_digest", None)
 
-# 回答反映後にウィジェットのキーへ値をセットするための保留バッファ
-# （ウィジェット生成前にのみ session_state のキーへ代入可能なため）
+# 回答/抽出反映のための保留バッファを安全に適用
+# - 同一ラン内に既にユーザが編集したキーは上書きしない（人手編集を優先）
+# - AIが最後に適用した値（ベースライン）と現値が一致する場合のみ更新
 pending_updates = st.session_state.pop("pending_widget_updates", None)
+ai_baseline = st.session_state.setdefault("ai_baseline", {})
+def _apply_if_not_modified(key: str, value):
+    if value is None:
+        return
+    if key not in st.session_state:
+        st.session_state[key] = value
+        ai_baseline[key] = value
+        return
+    current = st.session_state.get(key)
+    base = ai_baseline.get(key)
+    if current == base:
+        st.session_state[key] = value
+        ai_baseline[key] = value
+
 if isinstance(pending_updates, dict):
     for k, v in pending_updates.items():
-        if v is not None:
-            st.session_state[k] = v
+        _apply_if_not_modified(k, v)
 
 col_left, col_right = st.columns([2, 1])
 
@@ -80,16 +94,41 @@ with col_right:
 
         # 3欄のウィジェットキーへも反映（次の rerun の先頭で適用）
         form_preview = result.get("form", {}) if isinstance(result, dict) else {}
+        updates = {}
+        # 3欄
         dc_val = form_preview.get("desired_contract")
         our_val = form_preview.get("our_overall_summary")
         their_val = form_preview.get("their_overall_summary")
-        updates = {}
-        if dc_val is not None:
-            updates["desired_contract_widget"] = str(dc_val)
-        if our_val is not None:
-            updates["our_overall_summary_widget"] = str(our_val)
-        if their_val is not None:
-            updates["their_overall_summary_widget"] = str(their_val)
+        if isinstance(dc_val, str):
+            updates["desired_contract_widget"] = dc_val
+        if isinstance(our_val, str):
+            updates["our_overall_summary_widget"] = our_val
+        if isinstance(their_val, str):
+            updates["their_overall_summary_widget"] = their_val
+        # 優先拡張フィールド（人手編集を上書きしない・ベースライン比較で適用）
+        rd = form_preview.get("request_date")
+        if isinstance(rd, _dt_date):
+            updates["request_date_widget"] = rd
+        nd = form_preview.get("normal_due_date") or form_preview.get("desired_due_date")
+        if isinstance(nd, _dt_date):
+            updates["normal_due_date_widget"] = nd
+        for text_key, widget_key in [
+            ("requester_department", "requester_department_widget"),
+            ("requester_manager", "requester_manager_widget"),
+            ("requester_staff", "requester_staff_widget"),
+            ("project_name", "project_name_widget"),
+            ("activity_purpose", "activity_purpose_widget"),
+            ("activity_start", "activity_start_widget"),
+            ("counterparty_name", "counterparty_name_widget"),
+            ("counterparty_address", "counterparty_address_widget"),
+            ("counterparty_profile", "counterparty_profile_widget"),
+        ]:
+            val = form_preview.get(text_key)
+            if isinstance(val, str):
+                updates[widget_key] = val
+        amt = form_preview.get("amount_jpy")
+        if isinstance(amt, int):
+            updates["amount_jpy_widget"] = amt
         if updates:
             st.session_state["pending_widget_updates"] = updates
 
@@ -148,21 +187,24 @@ with col_main:
     # 入力ウィジェット（フォームを使わずリアクティブに）
     # 基本情報
     request_date = st.date_input(
-        "依頼日", value=form_data.get("request_date") or _dt_date.today()
+        "依頼日", value=form_data.get("request_date") or _dt_date.today(), key="request_date_widget"
     )
     normal_due_date = st.date_input(
         "通常納期",
         value=form_data.get("normal_due_date")
         or form_data.get("desired_due_date")
         or _dt_date.today(),
+        key="normal_due_date_widget",
     )
     requester_department = st.text_input(
-        "依頼者_所属", value=form_data.get("requester_department", "")
+        "依頼者_所属", value=form_data.get("requester_department", ""), key="requester_department_widget"
     )
     requester_manager = st.text_input(
-        "依頼者_責任者", value=form_data.get("requester_manager", "")
+        "依頼者_責任者", value=form_data.get("requester_manager", ""), key="requester_manager_widget"
     )
-    requester_staff = st.text_input("依頼者_担当者", value=form_data.get("requester_staff", ""))
+    requester_staff = st.text_input(
+        "依頼者_担当者", value=form_data.get("requester_staff", ""), key="requester_staff_widget"
+    )
 
     # 案件_種別（最初に追加）
     project_type_options = vocab.get("project_type", [])
@@ -198,11 +240,15 @@ with col_main:
         index=pdf_index,
     )
 
-    project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
-    activity_purpose = st.text_area(
-        "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
+    project_name = st.text_input(
+        "案件_案件名", value=form_data.get("project_name", ""), key="project_name_widget"
     )
-    activity_start = st.text_input("案件_実活動時期", value=form_data.get("activity_start", ""))
+    activity_purpose = st.text_area(
+        "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80, key="activity_purpose_widget"
+    )
+    activity_start = st.text_input(
+        "案件_実活動時期", value=form_data.get("activity_start", ""), key="activity_start_widget"
+    )
 
     # 契約対象品目（単一選択）
     project_target_item_options = vocab.get(
@@ -224,13 +270,13 @@ with col_main:
     )
 
     counterparty_name = st.text_input(
-        "契約相手_名称", value=form_data.get("counterparty_name", "")
+        "契約相手_名称", value=form_data.get("counterparty_name", ""), key="counterparty_name_widget"
     )
     counterparty_address = st.text_input(
-        "契約相手_所在地", value=form_data.get("counterparty_address", "")
+        "契約相手_所在地", value=form_data.get("counterparty_address", ""), key="counterparty_address_widget"
     )
     counterparty_profile = st.text_area(
-        "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80
+        "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80, key="counterparty_profile_widget"
     )
     # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
     counterparty_type_options = vocab.get("counterparty_type", [])
@@ -287,7 +333,7 @@ with col_main:
     )
 
     amount_jpy = st.number_input(
-        "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0))
+        "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0)), key="amount_jpy_widget"
     )
 
     # 開示される情報
