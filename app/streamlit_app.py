@@ -70,23 +70,7 @@ with st.sidebar:
         else:
             st.session_state["extract_feedback"] = ("success", "Geminiで抽出結果を取得しました。")
 
-    st.divider()
-    st.caption("サンプルを読み込む")
-    if st.button("サンプル読込", use_container_width=True):
-        p = os.path.join(BASE_DIR, "sample_data", "example_input.txt")
-        with open(p, "r", encoding="utf-8") as f_text:
-            st.session_state["source_text"] = f_text.read()
-            st.session_state["source_text_widget"] = st.session_state["source_text"]
-            st.session_state["uploaded_file_digest"] = None
-            sample_result = extract_contract_form(st.session_state["source_text"])
-            st.session_state["extracted"] = sample_result
-            if sample_result.get("error"):
-                st.session_state["extract_feedback"] = ("warning", sample_result["error"])
-            else:
-                st.session_state["extract_feedback"] = (
-                    "success",
-                    "サンプルテキストから抽出しました。",
-                )
+    
 
 feedback = st.session_state.pop("extract_feedback", None)
 if feedback:
@@ -107,9 +91,9 @@ def load_vocab():
 
 vocab = load_vocab()
 
-col_form, col_preview = st.columns([3, 2])
+col_main = st.container()
 
-with col_form:
+with col_main:
     st.subheader("フォーム（編集可）")
 
     # 既存データの展開
@@ -360,19 +344,11 @@ with col_form:
             )
             st.caption(f"監査ログを保存: {os.path.basename(audit_path)}")
 
-with col_preview:
-    st.subheader("プレビュー（抽出結果 JSON）")
-    st.json(st.session_state.get("extracted", {"form": {}, "missing_fields": []}), expanded=False)
-
-    st.subheader("CSVマッピング")
-    st.write("マッピング: ", os.path.relpath(MAPPING))
-
-    # Follow-up questions to ask user (if any)
+    
     extracted_payload = st.session_state.get("extracted", {})
     follow_up = extracted_payload.get("follow_up_questions") or []
     if follow_up:
         st.subheader("追加で確認したい点 (最大3件)")
-        # Render inputs for answers; do not include in CSV
         answers: Dict[int, str] = {}
         for idx, q in enumerate(follow_up):
             st.markdown(f"Q{idx+1}. {q}")
@@ -385,7 +361,6 @@ with col_preview:
             )
 
         def _map_question_to_section(question: str) -> int | None:
-            # Map known question patterns to desired-contract section numbers (1..4)
             if "取り扱い方針" in question or "目標は何ですか" in question:
                 return 1
             if "追加で重視" in question or "ノウハウ帰属" in question:
@@ -397,9 +372,6 @@ with col_preview:
             return None
 
         def _parse_sections(dc_text: str) -> Dict[int, List[str]]:
-            """Parse existing desired_contract into sections of bullet lines.
-            Returns {1:[...],2:[...],3:[...],4:[...]}. Creates empty list for missing.
-            """
             sections: Dict[int, List[str]] = {1: [], 2: [], 3: [], 4: []}
             if not dc_text:
                 return sections
@@ -441,7 +413,6 @@ with col_preview:
         if st.button("回答を送信", type="secondary", use_container_width=True):
             form_data = extracted_payload.get("form", {})
             source_text = st.session_state.get("source_text", "")
-            # Base desired_contract: prefer existing; otherwise auto-summarize from source
             base_dc = form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
 
             our_summary = form_data.get("our_overall_summary", "") or ""
@@ -456,7 +427,6 @@ with col_preview:
                     continue
                 answered_qas.append({"question": q, "answer": ans})
 
-            # Default to current values; attempt Gemini-based update first
             updated_dc = base_dc
             explanation_for_ui: Dict[str, Dict[str, str]] | None = None
             try:
@@ -477,7 +447,6 @@ with col_preview:
                     if isinstance(maybe_expl, dict):
                         explanation_for_ui = maybe_expl  # type: ignore[assignment]
             except Exception:
-                # Fallback: heuristic merge into sections
                 sections = _parse_sections(base_dc)
                 for qa in answered_qas:
                     q = qa["question"]
@@ -508,7 +477,6 @@ with col_preview:
                         "reason": "回答（相手/先方 等）を反映" if form_data.get("their_overall_summary", "") != their_summary else "変更不要",
                     },
                 }
-            # Write back into extracted payload (session), not into CSV mapping directly
             st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
             st.session_state["extracted"].setdefault("form", {})
             st.session_state["extracted"]["form"]["desired_contract"] = updated_dc
@@ -517,7 +485,6 @@ with col_preview:
             if their_summary:
                 st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
 
-            # Keep only unanswered questions
             if remaining_questions:
                 st.session_state["extracted"]["follow_up_questions"] = remaining_questions
             else:
@@ -525,7 +492,6 @@ with col_preview:
 
             st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
 
-            # Store explanation for UI
             if explanation_for_ui is not None:
                 st.session_state["qa_update_explanation"] = explanation_for_ui
                 st.session_state["qa_update_engine"] = "gemini"
@@ -535,7 +501,7 @@ with col_preview:
                 )
                 st.session_state["qa_update_engine"] = "fallback"
 
-    # Show last update explanation (if exists)
+    
     expl = st.session_state.get("qa_update_explanation")
     if expl:
         engine = st.session_state.get("qa_update_engine", "gemini")
