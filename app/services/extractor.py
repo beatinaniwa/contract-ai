@@ -13,6 +13,7 @@ from models.schemas import ContractForm
 from config_loader import ConfigNotFoundError, load_secret
 from .normalizer import normalize_amount_jpy
 from .validator import validate_form
+from .desired_contract import summarize_desired_contract
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,9 @@ PROMPT_TEMPLATE = """
 あなたは日本語の打ち合わせメモから契約申請フォームの情報を抽出するアシスタントです。
 出力はJSONのみで、余分な文章やマークダウンを含めないでください。
 全てのキーを含む "form" オブジェクトを生成し、値が不明な場合は null を設定します。
+
+加えて、最後の項目「どんな契約にしたいか」を次の4観点で事実のみから構成してください（推測禁止）。
+不足がある場合は、ユーザが答えやすいフォローアップ質問を最大3つまで "follow_up_questions" に配列で出力してください。
 
 必須のJSON構造:
 {{
@@ -66,8 +70,10 @@ PROMPT_TEMPLATE = """
     "their_activity_summary": 文字列または null,
     "their_productization_summary": 文字列または null,
     "received_date": "YYYY-MM-DD" または null,
-    "case_number": 文字列または null
-  }}
+    "case_number": 文字列または null,
+    "desired_contract": 文字列または null
+  }},
+  "follow_up_questions": 配列（0〜3件の日本語の短い質問）
 }}
 
 制約:
@@ -78,8 +84,59 @@ PROMPT_TEMPLATE = """
 - 箇条書きなど複数の記述は文脈を保った文字列にまとめてください。
 - 不明な情報を推測せず、見つからない場合は null としてください。
 
+「どんな契約にしたいか」の記述形式（必須）:
+1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）\n- <事実の箇条書き>
+2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）\n- <事実の箇条書き>
+3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）\n- <事実の箇条書き>
+4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）\n- <事実の箇条書き>
+
 入力テキスト:
 {conversation}
+"""
+
+UPDATE_PROMPT_TEMPLATE = """
+あなたは日本語で契約申請フォームの3つの欄を、ユーザの補足回答に基づき必要な場合のみ更新するアシスタントです。推測はせず、事実（元テキスト/既存値/回答）にのみ基づいてください。
+
+対象欄:
+- desired_contract（「どんな契約にしたいか」）: 次の4観点で、番号つき見出し + 箇条書きの構成を維持してください。
+  1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
+  2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
+  3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）
+  4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）
+- our_overall_summary（概要_当社の契約活動概要および成果事業化概要）
+- their_overall_summary（概要_相手の契約活動概要および成果事業化概要）
+
+入力:
+- source_text: 元の会話/資料テキスト。
+- current_values: 現在の3欄の内容（空文字可）。
+- qa: 補足質問とその回答の配列（未回答は含めない）。
+
+更新方針:
+- 回答が新たな事実を提供し、かつ当該欄をより必要十分にする場合のみ更新してください。
+- 回答が曖昧/不十分な場合は既存の記述を維持してください。
+- desired_contract は4章構成・箇条書きを維持し、文言は回答やsource_textの原文に忠実にまとめてください。
+- 3欄すべて、存在しない事実や推測を追加しないでください。
+
+出力は次のJSONのみ:
+{
+  "desired_contract": string,
+  "our_overall_summary": string,
+  "their_overall_summary": string,
+  "explanation": {
+    "desired_contract": {"action": "updated" | "unchanged", "reason": string},
+    "our_overall_summary": {"action": "updated" | "unchanged", "reason": string},
+    "their_overall_summary": {"action": "updated" | "unchanged", "reason": string}
+  }
+}
+
+source_text:
+{source_text}
+
+current_values:
+{current_values}
+
+qa:
+{qa}
 """
 
 
@@ -126,8 +183,22 @@ def _extract_with_gemini(text: str) -> Dict[str, Any]:
         raise ValueError("Gemini response did not include a valid 'form' object")
 
     form = _coerce_form(raw_form)
+    out_form = form.model_dump(exclude_none=True)
+
+    # Fill desired_contract if missing, and compute questions from source text
+    desired_text, questions = summarize_desired_contract(text)
+    if not out_form.get("desired_contract") and desired_text.strip():
+        out_form["desired_contract"] = desired_text
+
     _, missing = validate_form(form)
-    return {"form": form.model_dump(exclude_none=True), "missing_fields": missing}
+    result: Dict[str, Any] = {"form": out_form, "missing_fields": missing}
+    if isinstance(payload.get("follow_up_questions"), list) and payload.get(
+        "follow_up_questions"
+    ):
+        result["follow_up_questions"] = payload["follow_up_questions"]
+    elif questions:
+        result["follow_up_questions"] = questions
+    return result
 
 
 def _extract_with_regex(text: str) -> Dict[str, Any]:
@@ -189,8 +260,17 @@ def _extract_with_regex(text: str) -> Dict[str, Any]:
         data["case_number"] = case_number.group(1).strip()
 
     form = _coerce_form(data)
+    out_form = form.model_dump(exclude_none=True)
+
+    desired_text, questions = summarize_desired_contract(source)
+    if desired_text.strip():
+        out_form["desired_contract"] = desired_text
+
     _, missing = validate_form(form)
-    return {"form": form.model_dump(exclude_none=True), "missing_fields": missing}
+    result: Dict[str, Any] = {"form": out_form, "missing_fields": missing}
+    if questions:
+        result["follow_up_questions"] = questions
+    return result
 
 
 def _coerce_form(raw_form: Dict[str, Any]) -> ContractForm:
@@ -292,3 +372,65 @@ def _get_api_key() -> str:
 def _get_client():
     api_key = _get_api_key()
     return genai.Client(api_key=api_key)
+
+
+def update_contract_sections_with_gemini(
+    source_text: str,
+    current_values: Dict[str, str],
+    qa: Sequence[Dict[str, str]],
+) -> Dict[str, str]:
+    """Use Gemini to determine whether and how to update the three target fields.
+
+    Returns a dict with the three keys. Raises on configuration/API errors.
+    """
+    client = _get_client()
+    prompt = UPDATE_PROMPT_TEMPLATE.format(
+        source_text=source_text.strip(),
+        current_values=json.dumps(current_values, ensure_ascii=False, indent=2),
+        qa=json.dumps(list(qa), ensure_ascii=False, indent=2),
+    )
+    response = client.models.generate_content(
+        model=GEMINI_MODEL_NAME,
+        contents=prompt,
+    )
+    feedback = getattr(response, "prompt_feedback", None)
+    if feedback and getattr(feedback, "block_reason", None):
+        raise ValueError(f"Gemini blocked the prompt: {feedback.block_reason}")
+    content = getattr(response, "text", None)
+    if not content:
+        raise ValueError("Gemini response was empty")
+    parsed = _load_json(content)
+    before_dc = current_values.get("desired_contract", "") or ""
+    before_our = current_values.get("our_overall_summary", "") or ""
+    before_their = current_values.get("their_overall_summary", "") or ""
+
+    dc = str(parsed.get("desired_contract", before_dc))
+    our = str(parsed.get("our_overall_summary", before_our))
+    their = str(parsed.get("their_overall_summary", before_their))
+
+    explanation = parsed.get("explanation")
+    if not isinstance(explanation, dict):
+        # Build a minimal explanation from diffs if model didn't provide one
+        explanation = {}
+        explanation["desired_contract"] = {
+            "action": "updated" if dc != before_dc else "unchanged",
+            "reason": "回答に基づき内容を更新" if dc != before_dc else "既存の内容が必要十分のため変更なし",
+        }
+        explanation["our_overall_summary"] = {
+            "action": "updated" if our != before_our else "unchanged",
+            "reason": "回答を反映して追記/修正" if our != before_our else "回答により変更不要",
+        }
+        explanation["their_overall_summary"] = {
+            "action": "updated" if their != before_their else "unchanged",
+            "reason": "回答を反映して追記/修正" if their != before_their else "回答により変更不要",
+        }
+
+    out: Dict[str, str] = {
+        "desired_contract": dc,
+        "our_overall_summary": our,
+        "their_overall_summary": their,
+    }
+    # Attach explanation for UI consumption
+    out_with_expl: Dict[str, str] = dict(out)
+    out_with_expl["explanation"] = explanation  # type: ignore[assignment]
+    return out_with_expl

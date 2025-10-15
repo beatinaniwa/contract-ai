@@ -6,8 +6,8 @@ APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-import config_loader
-from services import extractor
+import config_loader  # noqa: E402
+from services import extractor  # noqa: E402
 
 
 def _clear_gemini_state(monkeypatch) -> None:

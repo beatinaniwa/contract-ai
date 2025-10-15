@@ -1,16 +1,20 @@
 import hashlib
 import os
 from datetime import date as _dt_date
+from typing import Literal, cast
 
 import streamlit as st
 import yaml
+from typing import List, Dict
 
 from models.schemas import ContractForm
 from services.audit import save_audit_log
 from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
+from services.extractor import update_contract_sections_with_gemini
 from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
+from services.desired_contract import summarize_desired_contract
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
@@ -279,8 +283,13 @@ with col_form:
 
     if submitted:
         # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
-        related_contract_flag = related_contract_flag or (
+        raw_related_flag = related_contract_flag or (
             "該当あり" if form_data.get("related_contracts") else "該当なし"
+        )
+        if raw_related_flag not in ("該当なし", "該当あり"):
+            raw_related_flag = "該当なし"
+        related_flag: Literal["該当なし", "該当あり"] = cast(
+            Literal["該当なし", "該当あり"], raw_related_flag
         )
         cf = ContractForm(
             request_date=request_date or None,
@@ -299,7 +308,7 @@ with col_form:
             counterparty_profile=counterparty_profile or None,
             counterparty_type=counterparty_type or None,
             contract_form=contract_form or None,
-            related_contract_flag=related_contract_flag or None,
+            related_contract_flag=related_flag,
             amount_jpy=amount_jpy or None,
             info_from_us=info_from_us,
             info_from_us_other=info_from_us_other,
@@ -308,6 +317,12 @@ with col_form:
             our_overall_summary=our_overall_summary or None,
             their_overall_summary=their_overall_summary or None,
             desired_contract=desired_contract or None,
+            # 自由記述系（抽出済みの既存値があれば保持）
+            contract_category=form_data.get("contract_category"),
+            procedure=form_data.get("procedure"),
+            cost_burden=form_data.get("cost_burden"),
+            restrictions=form_data.get("restrictions"),
+            notes=form_data.get("notes"),
             # 旧フィールドを残しておく（抽出プレビュー整合のため）
             desired_due_date=form_data.get("desired_due_date"),
             target_item_name=form_data.get("target_item_name"),
@@ -351,3 +366,192 @@ with col_preview:
 
     st.subheader("CSVマッピング")
     st.write("マッピング: ", os.path.relpath(MAPPING))
+
+    # Follow-up questions to ask user (if any)
+    extracted_payload = st.session_state.get("extracted", {})
+    follow_up = extracted_payload.get("follow_up_questions") or []
+    if follow_up:
+        st.subheader("追加で確認したい点 (最大3件)")
+        # Render inputs for answers; do not include in CSV
+        answers: Dict[int, str] = {}
+        for idx, q in enumerate(follow_up):
+            st.markdown(f"Q{idx+1}. {q}")
+            ans_key = f"qa_answer_{idx}"
+            answers[idx] = st.text_area(
+                label=f"回答{idx+1}",
+                key=ans_key,
+                height=60,
+                placeholder="（任意）必要十分な記載にするための補足を記入。未入力でも可。",
+            )
+
+        def _map_question_to_section(question: str) -> int | None:
+            # Map known question patterns to desired-contract section numbers (1..4)
+            if "取り扱い方針" in question or "目標は何ですか" in question:
+                return 1
+            if "追加で重視" in question or "ノウハウ帰属" in question:
+                return 2
+            if "実施・許諾の対象と範囲" in question:
+                return 3
+            if "想定リスク" in question or "FTO" in question:
+                return 4
+            return None
+
+        def _parse_sections(dc_text: str) -> Dict[int, List[str]]:
+            """Parse existing desired_contract into sections of bullet lines.
+            Returns {1:[...],2:[...],3:[...],4:[...]}. Creates empty list for missing.
+            """
+            sections: Dict[int, List[str]] = {1: [], 2: [], 3: [], 4: []}
+            if not dc_text:
+                return sections
+            lines = dc_text.splitlines()
+            current = None
+            for ln in lines:
+                if ln.lstrip().startswith("1."):
+                    current = 1
+                    continue
+                if ln.lstrip().startswith("2."):
+                    current = 2
+                    continue
+                if ln.lstrip().startswith("3."):
+                    current = 3
+                    continue
+                if ln.lstrip().startswith("4."):
+                    current = 4
+                    continue
+                if current and ln.lstrip().startswith("-"):
+                    sections[current].append(ln.lstrip()[1:].strip())
+            return sections
+
+        def _rebuild_desired_contract(sections: Dict[int, List[str]]) -> str:
+            titles = {
+                1: "1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
+                2: "2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
+                3: "3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）",
+                4: "4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）",
+            }
+            chunks: List[str] = []
+            for i in (1, 2, 3, 4):
+                bullets = sections.get(i, [])
+                if not bullets:
+                    bullets = ["記載なし"]
+                chunk = titles[i] + "\n- " + "\n- ".join(bullets)
+                chunks.append(chunk)
+            return "\n\n".join(chunks)
+
+        if st.button("回答を送信", type="secondary", use_container_width=True):
+            form_data = extracted_payload.get("form", {})
+            source_text = st.session_state.get("source_text", "")
+            # Base desired_contract: prefer existing; otherwise auto-summarize from source
+            base_dc = form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
+
+            our_summary = form_data.get("our_overall_summary", "") or ""
+            their_summary = form_data.get("their_overall_summary", "") or ""
+
+            remaining_questions: List[str] = []
+            answered_qas: List[Dict[str, str]] = []
+            for idx, q in enumerate(follow_up):
+                ans = (answers.get(idx) or "").strip()
+                if not ans:
+                    remaining_questions.append(q)
+                    continue
+                answered_qas.append({"question": q, "answer": ans})
+
+            # Default to current values; attempt Gemini-based update first
+            updated_dc = base_dc
+            explanation_for_ui: Dict[str, Dict[str, str]] | None = None
+            try:
+                if answered_qas:
+                    updated = update_contract_sections_with_gemini(
+                        source_text=source_text,
+                        current_values={
+                            "desired_contract": base_dc or "",
+                            "our_overall_summary": our_summary or "",
+                            "their_overall_summary": their_summary or "",
+                        },
+                        qa=answered_qas,
+                    )
+                    updated_dc = updated.get("desired_contract", base_dc) or base_dc
+                    our_summary = updated.get("our_overall_summary", our_summary) or our_summary
+                    their_summary = updated.get("their_overall_summary", their_summary) or their_summary
+                    maybe_expl = updated.get("explanation")
+                    if isinstance(maybe_expl, dict):
+                        explanation_for_ui = maybe_expl  # type: ignore[assignment]
+            except Exception:
+                # Fallback: heuristic merge into sections
+                sections = _parse_sections(base_dc)
+                for qa in answered_qas:
+                    q = qa["question"]
+                    ans = qa["answer"]
+                    sec = _map_question_to_section(q)
+                    if sec:
+                        sections.setdefault(sec, [])
+                        if ans not in sections[sec]:
+                            sections[sec].append(ans)
+                    if any(key in ans for key in ("当社", "弊社")):
+                        our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
+                    if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
+                        their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
+                updated_dc = _rebuild_desired_contract(sections)
+                explanation_for_ui = {
+                    "desired_contract": {
+                        "action": "updated" if updated_dc != base_dc else "unchanged",
+                        "reason": "回答内容を章別に追記（Gemini未使用のフォールバック）"
+                        if updated_dc != base_dc
+                        else "回答が空または変更不要のため維持（Gemini未使用のフォールバック）",
+                    },
+                    "our_overall_summary": {
+                        "action": "updated" if form_data.get("our_overall_summary", "") != our_summary else "unchanged",
+                        "reason": "回答（当社/弊社を含む）を反映" if form_data.get("our_overall_summary", "") != our_summary else "変更不要",
+                    },
+                    "their_overall_summary": {
+                        "action": "updated" if form_data.get("their_overall_summary", "") != their_summary else "unchanged",
+                        "reason": "回答（相手/先方 等）を反映" if form_data.get("their_overall_summary", "") != their_summary else "変更不要",
+                    },
+                }
+            # Write back into extracted payload (session), not into CSV mapping directly
+            st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
+            st.session_state["extracted"].setdefault("form", {})
+            st.session_state["extracted"]["form"]["desired_contract"] = updated_dc
+            if our_summary:
+                st.session_state["extracted"]["form"]["our_overall_summary"] = our_summary
+            if their_summary:
+                st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
+
+            # Keep only unanswered questions
+            if remaining_questions:
+                st.session_state["extracted"]["follow_up_questions"] = remaining_questions
+            else:
+                st.session_state["extracted"].pop("follow_up_questions", None)
+
+            st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
+
+            # Store explanation for UI
+            if explanation_for_ui is not None:
+                st.session_state["qa_update_explanation"] = explanation_for_ui
+                st.session_state["qa_update_engine"] = "gemini"
+            else:
+                st.session_state["qa_update_explanation"] = st.session_state.get(
+                    "qa_update_explanation", {}
+                )
+                st.session_state["qa_update_engine"] = "fallback"
+
+    # Show last update explanation (if exists)
+    expl = st.session_state.get("qa_update_explanation")
+    if expl:
+        engine = st.session_state.get("qa_update_engine", "gemini")
+        st.subheader("回答反映の判断結果")
+        if engine == "gemini":
+            st.caption("Gemini 2.5 Pro による更新判断")
+        else:
+            st.caption("Gemini未使用のフォールバックによる更新判断")
+
+        def _render_line(label: str, key: str):
+            info = expl.get(key, {}) if isinstance(expl, dict) else {}
+            action = info.get("action", "unknown")
+            reason = info.get("reason", "")
+            status = "更新" if action == "updated" else "変更なし" if action == "unchanged" else "不明"
+            st.write(f"- {label}: {status} — {reason}")
+
+        _render_line("どんな契約にしたいか", "desired_contract")
+        _render_line("概要_当社の契約活動概要および成果事業化概要", "our_overall_summary")
+        _render_line("概要_相手の契約活動概要および成果事業化概要", "their_overall_summary")
