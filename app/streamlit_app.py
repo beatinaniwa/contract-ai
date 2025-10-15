@@ -649,6 +649,8 @@ with col_main:
 
             updated_dc = base_dc
             explanation_for_ui: Dict[str, Dict[str, str]] | None = None
+            engine_status: str = "skipped"  # gemini|fallback|skipped
+            gemini_error: str | None = None
             try:
                 if answered_qas:
                     updated = update_contract_sections_with_gemini(
@@ -660,6 +662,7 @@ with col_main:
                         },
                         qa=answered_qas,
                     )
+                    engine_status = "gemini"
                     updated_dc = updated.get("desired_contract", base_dc) or base_dc
                     our_summary = updated.get("our_overall_summary", our_summary) or our_summary
                     their_summary = (
@@ -669,6 +672,7 @@ with col_main:
                     if isinstance(maybe_expl, dict):
                         explanation_for_ui = maybe_expl  # type: ignore[assignment]
             except Exception:
+                gemini_error = "Gemini の呼び出しに失敗しました（APIキー/ネットワーク/ブロックなど）"
                 sections = _parse_sections(base_dc)
                 for qa in answered_qas:
                     q = qa["question"]
@@ -709,6 +713,7 @@ with col_main:
                         else "変更不要",
                     },
                 }
+                engine_status = "fallback"
             st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
             st.session_state["extracted"].setdefault("form", {})
             st.session_state["extracted"]["form"]["desired_contract"] = updated_dc
@@ -789,9 +794,11 @@ with col_main:
                 st.session_state["extracted"].pop("follow_up_questions", None)
                 st.session_state["qa_round"] = 0  # リセット
 
-            # 反映の要約（Gemini吟味 or フォールバック）
+            # 反映の要約（Gemini / フォールバック / スキップ）
             engine_label = (
-                "Gemini 2.5 Pro" if explanation_for_ui is not None else "Gemini未使用のフォールバック"
+                "Gemini 2.5 Pro" if engine_status == "gemini"
+                else "Gemini未使用のフォールバック" if engine_status == "fallback"
+                else "Gemini未実行（回答未入力）"
             )
             def _stat_line(lbl: str, key: str) -> str:
                 info = (explanation_for_ui or {}).get(key, {}) if isinstance(explanation_for_ui, dict) else {}
@@ -813,22 +820,18 @@ with col_main:
                 _stat_line("概要_当社", "our_overall_summary"),
                 _stat_line("概要_相手", "their_overall_summary"),
             ]
+            addendum = f"\n（注意）{gemini_error}" if gemini_error else ""
             st.session_state["qa_feedback"] = (
                 "success",
-                f"{engine_label}で回答を吟味し、フォームへ反映しました。\n- " + "\n- ".join(summary_lines),
+                f"{engine_label}で回答を吟味し、フォームへ反映しました。\n- " + "\n- ".join(summary_lines) + addendum,
             )
 
             if not next_questions:
                 st.info("必要な情報は十分に集まりました。追加の質問はありません。")
 
-            if explanation_for_ui is not None:
-                st.session_state["qa_update_explanation"] = explanation_for_ui
-                st.session_state["qa_update_engine"] = "gemini"
-            else:
-                st.session_state["qa_update_explanation"] = st.session_state.get(
-                    "qa_update_explanation", {}
-                )
-                st.session_state["qa_update_engine"] = "fallback"
+            # エンジン種別を状態に保存
+            st.session_state["qa_update_explanation"] = explanation_for_ui or {}
+            st.session_state["qa_update_engine"] = engine_status
 
             # 値をキーへ反映済みのため、UIを即時更新
             try:
@@ -842,8 +845,10 @@ with col_main:
         st.subheader("回答反映の判断結果")
         if engine == "gemini":
             st.caption("Gemini 2.5 Pro による更新判断")
-        else:
+        elif engine == "fallback":
             st.caption("Gemini未使用のフォールバックによる更新判断")
+        else:
+            st.caption("Geminiは実行していません（回答未入力のため）")
 
         def _render_line(label: str, key: str):
             info = expl.get(key, {}) if isinstance(expl, dict) else {}
