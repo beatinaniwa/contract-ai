@@ -20,8 +20,8 @@ from services.desired_contract import summarize_desired_contract
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
 
-st.set_page_config(page_title="契約書作成アシスタント（MVP）", layout="wide")
-st.title("契約書作成アシスタント（CSV出力 / MVP）")
+st.set_page_config(page_title="契約書作成アシスタント", layout="wide")
+st.title("契約書作成アシスタント")
 
 if "source_text_widget" not in st.session_state:
     st.session_state["source_text_widget"] = st.session_state.get("source_text", "")
@@ -294,7 +294,9 @@ with col_main:
                 re.compile(r"^生じ得る知財[（(].*[）)]とその性質[（(].*[）)]$"),
                 # 3. と 4. の見出し
                 re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容[（(].*[）)]$"),
-                re.compile(r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"),
+                re.compile(
+                    r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"
+                ),
             ]
             out_lines: list[str] = []
             for ln in text.splitlines():
