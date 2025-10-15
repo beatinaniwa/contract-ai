@@ -118,16 +118,16 @@ UPDATE_PROMPT_TEMPLATE = """
 - 3欄すべて、存在しない事実や推測を追加しないでください。
 
 出力は次のJSONのみ:
-{
+{{
   "desired_contract": string,
   "our_overall_summary": string,
   "their_overall_summary": string,
-  "explanation": {
-    "desired_contract": {"action": "updated" | "unchanged", "reason": string},
-    "our_overall_summary": {"action": "updated" | "unchanged", "reason": string},
-    "their_overall_summary": {"action": "updated" | "unchanged", "reason": string}
-  }
-}
+  "explanation": {{
+    "desired_contract": {{"action": "updated" | "unchanged", "reason": string}},
+    "our_overall_summary": {{"action": "updated" | "unchanged", "reason": string}},
+    "their_overall_summary": {{"action": "updated" | "unchanged", "reason": string}}
+  }}
+}}
 
 source_text:
 {source_text}
