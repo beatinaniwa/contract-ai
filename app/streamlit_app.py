@@ -4,6 +4,7 @@ from datetime import date as _dt_date
 from typing import Literal, cast
 
 import streamlit as st
+import re
 import yaml
 from typing import List, Dict
 
@@ -262,8 +263,28 @@ with col_main:
             height=100,
         )
 
+        # 「どんな契約にしたいか」のガイダンス（テキストエリアの外に説明を表示）
+        st.markdown(
+            """
+            どんな契約にしたいか（記入ガイド）
+
+            1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
+            2. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
+            3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）
+            4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）
+            """
+        )
+
+        # 初期テンプレート（未入力時のみ 1〜4 の番号をあらかじめ用意）
+        desired_contract_default = form_data.get("desired_contract", "").strip()
+        if not desired_contract_default:
+            desired_contract_default = "\n".join(["1. ", "", "2. ", "", "3. ", "", "4. "]) + "\n"
+
         desired_contract = st.text_area(
-            "どんな契約にしたいか", value=form_data.get("desired_contract", ""), height=80
+            "どんな契約にしたいか",
+            value=desired_contract_default,
+            height=160,
+            help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
         )
 
         submitted = st.form_submit_button("CSV出力", type="primary")
@@ -380,17 +401,13 @@ with col_main:
             lines = dc_text.splitlines()
             current = None
             for ln in lines:
-                if ln.lstrip().startswith("1."):
-                    current = 1
-                    continue
-                if ln.lstrip().startswith("2."):
-                    current = 2
-                    continue
-                if ln.lstrip().startswith("3."):
-                    current = 3
-                    continue
-                if ln.lstrip().startswith("4."):
-                    current = 4
+                # 「N. 内容」のように番号の後に直接内容が続く場合も取り込む
+                m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
+                if m:
+                    current = int(m.group(1))
+                    inline = m.group(2).strip()
+                    if inline:
+                        sections[current].append(inline)
                     continue
                 if current and ln.lstrip().startswith("-"):
                     sections[current].append(ln.lstrip()[1:].strip())
