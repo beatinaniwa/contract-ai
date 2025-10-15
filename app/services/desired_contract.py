@@ -37,7 +37,7 @@ def summarize_desired_contract(text: str) -> Tuple[str, List[str]]:
     Never infer; only include sentences that appear in the source text.
     If a viewpoint has no extractable facts, mark as '記載なし'.
     Returns a tuple of (summary_text, follow_up_questions).
-    The follow-up questions are at most 3 and phrased for easy user answers.
+    The follow-up questions are at most 5 and phrased for easy user answers.
     """
     sentences = _split_sentences_jp(text)
 
@@ -88,25 +88,25 @@ def summarize_desired_contract(text: str) -> Tuple[str, List[str]]:
 
     summary = "\n\n".join(sections)
 
-    # Build up to 3 questions for missing areas
+    # Build up to 5 questions for missing areas
     questions: List[str] = []
-    if not vp1 and len(questions) < 3:
+    if not vp1 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）知財の取り扱い方針（創出/権利化/ライセンス/売買/保証）のうち、今回の目標は何ですか？"
         )
-    if not vp2 and len(questions) < 3:
+    if not vp2 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）知財面で追加で重視したい事項（例: ノウハウ帰属、譲渡可否、保証範囲）がありますか？"
         )
-    if not vp3 and len(questions) < 3:
+    if not vp3 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）実施・許諾の対象と範囲（当社製品/相手製品/双方、地域・期間、サブライセンス可否）を教えてください。"
         )
-    if not vp4 and len(questions) < 3:
+    if not vp4 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）想定リスク（自己実施の支障、第三者権利、コンタミ、実施料 等）があれば列挙してください。"
         )
 
-    # Ensure at most 3
-    questions = questions[:3]
+    # Ensure at most 5
+    questions = questions[:5]
     return summary, questions

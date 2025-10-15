@@ -68,6 +68,7 @@ with col_right:
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
+        st.session_state["qa_round"] = 0
         if result.get("error"):
             st.session_state["extract_feedback"] = ("warning", result["error"])
         else:
@@ -463,7 +464,12 @@ with col_main:
     extracted_payload = st.session_state.get("extracted", {})
     follow_up = extracted_payload.get("follow_up_questions") or []
     if follow_up:
-        st.subheader("追加で確認したい点 (最大3件)")
+        st.subheader("追加で確認したい点 (最大5件)")
+        round_no = int(st.session_state.get("qa_round", 0))
+        if round_no == 0:
+            st.caption("第1ラウンドの確認質問です。必要な範囲でご回答ください。")
+        else:
+            st.caption("第2ラウンドの確認質問です。未充足の点のみ再確認します。")
         answers: Dict[int, str] = {}
         for idx, q in enumerate(follow_up):
             st.markdown(f"Q{idx + 1}. {q}")
@@ -610,12 +616,71 @@ with col_main:
             if their_summary:
                 st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
 
-            if remaining_questions:
-                st.session_state["extracted"]["follow_up_questions"] = remaining_questions
+            # 汎用的なセクション解析（UI内ヘルパーを活用）
+            def _sections_status(dc_text: str) -> Dict[int, bool]:
+                sec = _parse_sections(dc_text)
+                status: Dict[int, bool] = {}
+                for i in (1, 2, 3, 4):
+                    bullets = [b for b in sec.get(i, []) if b and b.strip()]
+                    if not bullets:
+                        status[i] = False
+                    elif len(bullets) == 1 and bullets[0] == "記載なし":
+                        status[i] = False
+                    else:
+                        status[i] = True
+                return status
+
+            def _build_questions_for_missing(sections_ok: Dict[int, bool]) -> List[str]:
+                q_list: List[str] = []
+                if not sections_ok.get(1, False):
+                    q_list.append(
+                        "（どんな契約にしたいか補足）知財の取り扱い方針（創出/権利化/ライセンス/売買/保証）のうち、今回の目標は何ですか？"
+                    )
+                if not sections_ok.get(2, False):
+                    q_list.append(
+                        "（どんな契約にしたいか補足）知財面で追加で重視したい事項（例: ノウハウ帰属、譲渡可否、保証範囲）がありますか？"
+                    )
+                if not sections_ok.get(3, False):
+                    q_list.append(
+                        "（どんな契約にしたいか補足）実施・許諾の対象と範囲（当社製品/相手製品/双方、地域・期間、サブライセンス可否）を教えてください。"
+                    )
+                if not sections_ok.get(4, False):
+                    q_list.append(
+                        "（どんな契約にしたいか補足）想定リスク（自己実施の支障、第三者権利、コンタミ、実施料 等）があれば列挙してください。"
+                    )
+                # 追加の要約欄（空のときのみ簡潔に質問）
+                if not (our_summary or "").strip():
+                    q_list.append("（概要補足）当社の契約活動概要や成果事業化の要点を一言で教えてください。")
+                if not (their_summary or "").strip():
+                    q_list.append("（概要補足）相手の契約活動概要や成果事業化の要点を一言で教えてください。")
+                return q_list
+
+            # 次ラウンドの質問生成（最大5件）
+            round_no = int(st.session_state.get("qa_round", 0))
+            sections_ok = _sections_status(updated_dc)
+            next_candidates = remaining_questions + _build_questions_for_missing(sections_ok)
+            # 重複除去を順序維持で
+            seen = set()
+            next_questions: List[str] = []
+            for q in next_candidates:
+                if q not in seen and q.strip():
+                    seen.add(q)
+                    next_questions.append(q)
+                if len(next_questions) >= 5:
+                    break
+
+            # 2ラウンドまで。必要な場合のみ次の質問を提示。
+            if next_questions and round_no < 1:
+                st.session_state["extracted"]["follow_up_questions"] = next_questions
+                st.session_state["qa_round"] = round_no + 1
             else:
                 st.session_state["extracted"].pop("follow_up_questions", None)
+                st.session_state["qa_round"] = 0  # リセット
 
             st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
+
+            if not next_questions:
+                st.info("必要な情報は十分に集まりました。追加の質問はありません。")
 
             if explanation_for_ui is not None:
                 st.session_state["qa_update_explanation"] = explanation_for_ui

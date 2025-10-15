@@ -39,7 +39,7 @@ PROMPT_TEMPLATE = """
 全てのキーを含む "form" オブジェクトを生成し、値が不明な場合は null を設定します。
 
 加えて、最後の項目「どんな契約にしたいか」を次の4観点で事実のみから構成してください（推測禁止）。
-不足がある場合は、ユーザが答えやすいフォローアップ質問を最大3つまで "follow_up_questions" に配列で出力してください。
+不足がある場合は、ユーザが答えやすいフォローアップ質問を最大5つまで "follow_up_questions" に配列で出力してください。
 
 必須のJSON構造:
 {{
@@ -73,7 +73,7 @@ PROMPT_TEMPLATE = """
     "case_number": 文字列または null,
     "desired_contract": 文字列または null
   }},
-  "follow_up_questions": 配列（0〜3件の日本語の短い質問）
+  "follow_up_questions": 配列（0〜5件の日本語の短い質問）
 }}
 
 制約:
