@@ -28,6 +28,14 @@ if "source_text_widget" not in st.session_state:
 
 st.session_state.setdefault("uploaded_file_digest", None)
 
+# 回答反映後にウィジェットのキーへ値をセットするための保留バッファ
+# （ウィジェット生成前にのみ session_state のキーへ代入可能なため）
+pending_updates = st.session_state.pop("pending_widget_updates", None)
+if isinstance(pending_updates, dict):
+    for k, v in pending_updates.items():
+        if v is not None:
+            st.session_state[k] = v
+
 col_left, col_right = st.columns([2, 1])
 
 with col_right:
@@ -630,15 +638,16 @@ with col_main:
             if their_summary:
                 st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
 
-            # UIウィジェット（キー）にも即時反映
+            # UIウィジェット（キー）への反映は次の rerun で行う（生成前に値を入れる必要があるため）
             try:
-                st.session_state["desired_contract_widget"] = _strip_desired_titles(updated_dc)
+                dc_for_widget = _strip_desired_titles(updated_dc)
             except Exception:
-                st.session_state["desired_contract_widget"] = updated_dc
-            if our_summary is not None:
-                st.session_state["our_overall_summary_widget"] = our_summary
-            if their_summary is not None:
-                st.session_state["their_overall_summary_widget"] = their_summary
+                dc_for_widget = updated_dc
+            st.session_state["pending_widget_updates"] = {
+                "desired_contract_widget": dc_for_widget,
+                "our_overall_summary_widget": our_summary,
+                "their_overall_summary_widget": their_summary,
+            }
 
             # 汎用的なセクション解析（UI内ヘルパーを活用）
             def _sections_status(dc_text: str) -> Dict[int, bool]:
