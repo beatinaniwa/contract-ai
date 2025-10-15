@@ -70,7 +70,6 @@ with st.sidebar:
         else:
             st.session_state["extract_feedback"] = ("success", "Geminiで抽出結果を取得しました。")
 
-    
 
 feedback = st.session_state.pop("extract_feedback", None)
 if feedback:
@@ -118,18 +117,20 @@ with col_main:
         requester_manager = st.text_input(
             "依頼者_責任者", value=form_data.get("requester_manager", "")
         )
-        requester_staff = st.text_input(
-            "依頼者_担当者", value=form_data.get("requester_staff", "")
-        )
+        requester_staff = st.text_input("依頼者_担当者", value=form_data.get("requester_staff", ""))
 
         # 案件_種別（最初に追加）
         project_type_options = vocab.get("project_type", [])
         default_project_type = form_data.get("project_type")
         project_type_index = (
-            project_type_options.index(default_project_type)
-            if default_project_type in project_type_options
+            (
+                project_type_options.index(default_project_type)
+                if default_project_type in project_type_options
+                else 0
+            )
+            if project_type_options
             else 0
-        ) if project_type_options else 0
+        )
         project_type = st.selectbox(
             "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
         )
@@ -138,10 +139,14 @@ with col_main:
         project_domestic_foreign_options = vocab.get("project_domestic_foreign", [])
         default_pdf = form_data.get("project_domestic_foreign")
         pdf_index = (
-            project_domestic_foreign_options.index(default_pdf)
-            if default_pdf in project_domestic_foreign_options
+            (
+                project_domestic_foreign_options.index(default_pdf)
+                if default_pdf in project_domestic_foreign_options
+                else 0
+            )
+            if project_domestic_foreign_options
             else 0
-        ) if project_domestic_foreign_options else 0
+        )
         project_domestic_foreign = st.selectbox(
             "案件_国内外",
             options=project_domestic_foreign_options or ["国内"],
@@ -152,16 +157,14 @@ with col_main:
         activity_purpose = st.text_area(
             "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
         )
-        activity_start = st.text_input(
-            "案件_実活動時期", value=form_data.get("activity_start", "")
-        )
+        activity_start = st.text_input("案件_実活動時期", value=form_data.get("activity_start", ""))
 
         # 契約対象品目（単一選択）
         project_target_item_options = vocab.get(
             "project_target_item", ["ハード", "ソフト", "技術", "役務", "その他"]
         )
-        default_target_raw = (
-            form_data.get("project_target_item") or form_data.get("target_item_name")
+        default_target_raw = form_data.get("project_target_item") or form_data.get(
+            "target_item_name"
         )
         if default_target_raw in project_target_item_options:
             project_target_item_index = project_target_item_options.index(default_target_raw)
@@ -188,11 +191,11 @@ with col_main:
             "概要_相手区分", options=vocab["counterparty_type"], index=0
         )
 
-        contract_form = st.selectbox(
-            "概要_契約書式", options=vocab["contract_form"], index=0
-        )
+        contract_form = st.selectbox("概要_契約書式", options=vocab["contract_form"], index=0)
         related_contract_flag = st.selectbox(
-            "概要_関連契約", options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]), index=0
+            "概要_関連契約",
+            options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
+            index=0,
         )
 
         amount_jpy = st.number_input(
@@ -204,7 +207,7 @@ with col_main:
             "disclosed_info_options",
             ["要求仕様", "関連技術情報", "図面", "サンプル"],
         )
-        info_from_us = st.multiselect(
+        info_from_us: List[str] = st.multiselect(
             "概要_開示される情報_当社から",
             options=info_options,
             default=form_data.get("info_from_us", []),
@@ -217,7 +220,7 @@ with col_main:
             key="info_from_us_other",
         )
 
-        info_from_them = st.multiselect(
+        info_from_them: List[str] = st.multiselect(
             "概要_開示される情報_相手から",
             options=info_options,
             default=form_data.get("info_from_them", []),
@@ -344,17 +347,16 @@ with col_main:
             )
             st.caption(f"監査ログを保存: {os.path.basename(audit_path)}")
 
-    
     extracted_payload = st.session_state.get("extracted", {})
     follow_up = extracted_payload.get("follow_up_questions") or []
     if follow_up:
         st.subheader("追加で確認したい点 (最大3件)")
         answers: Dict[int, str] = {}
         for idx, q in enumerate(follow_up):
-            st.markdown(f"Q{idx+1}. {q}")
+            st.markdown(f"Q{idx + 1}. {q}")
             ans_key = f"qa_answer_{idx}"
             answers[idx] = st.text_area(
-                label=f"回答{idx+1}",
+                label=f"回答{idx + 1}",
                 key=ans_key,
                 height=60,
                 placeholder="（任意）必要十分な記載にするための補足を記入。未入力でも可。",
@@ -413,7 +415,9 @@ with col_main:
         if st.button("回答を送信", type="secondary", use_container_width=True):
             form_data = extracted_payload.get("form", {})
             source_text = st.session_state.get("source_text", "")
-            base_dc = form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
+            base_dc = (
+                form_data.get("desired_contract") or summarize_desired_contract(source_text)[0]
+            )
 
             our_summary = form_data.get("our_overall_summary", "") or ""
             their_summary = form_data.get("their_overall_summary", "") or ""
@@ -442,7 +446,9 @@ with col_main:
                     )
                     updated_dc = updated.get("desired_contract", base_dc) or base_dc
                     our_summary = updated.get("our_overall_summary", our_summary) or our_summary
-                    their_summary = updated.get("their_overall_summary", their_summary) or their_summary
+                    their_summary = (
+                        updated.get("their_overall_summary", their_summary) or their_summary
+                    )
                     maybe_expl = updated.get("explanation")
                     if isinstance(maybe_expl, dict):
                         explanation_for_ui = maybe_expl  # type: ignore[assignment]
@@ -459,7 +465,9 @@ with col_main:
                     if any(key in ans for key in ("当社", "弊社")):
                         our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
                     if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
-                        their_summary = (their_summary + ("\n" if their_summary else "") + ans).strip()
+                        their_summary = (
+                            their_summary + ("\n" if their_summary else "") + ans
+                        ).strip()
                 updated_dc = _rebuild_desired_contract(sections)
                 explanation_for_ui = {
                     "desired_contract": {
@@ -469,12 +477,20 @@ with col_main:
                         else "回答が空または変更不要のため維持（Gemini未使用のフォールバック）",
                     },
                     "our_overall_summary": {
-                        "action": "updated" if form_data.get("our_overall_summary", "") != our_summary else "unchanged",
-                        "reason": "回答（当社/弊社を含む）を反映" if form_data.get("our_overall_summary", "") != our_summary else "変更不要",
+                        "action": "updated"
+                        if form_data.get("our_overall_summary", "") != our_summary
+                        else "unchanged",
+                        "reason": "回答（当社/弊社を含む）を反映"
+                        if form_data.get("our_overall_summary", "") != our_summary
+                        else "変更不要",
                     },
                     "their_overall_summary": {
-                        "action": "updated" if form_data.get("their_overall_summary", "") != their_summary else "unchanged",
-                        "reason": "回答（相手/先方 等）を反映" if form_data.get("their_overall_summary", "") != their_summary else "変更不要",
+                        "action": "updated"
+                        if form_data.get("their_overall_summary", "") != their_summary
+                        else "unchanged",
+                        "reason": "回答（相手/先方 等）を反映"
+                        if form_data.get("their_overall_summary", "") != their_summary
+                        else "変更不要",
                     },
                 }
             st.session_state.setdefault("extracted", {"form": {}, "missing_fields": []})
@@ -501,7 +517,6 @@ with col_main:
                 )
                 st.session_state["qa_update_engine"] = "fallback"
 
-    
     expl = st.session_state.get("qa_update_explanation")
     if expl:
         engine = st.session_state.get("qa_update_engine", "gemini")
@@ -515,7 +530,9 @@ with col_main:
             info = expl.get(key, {}) if isinstance(expl, dict) else {}
             action = info.get("action", "unknown")
             reason = info.get("reason", "")
-            status = "更新" if action == "updated" else "変更なし" if action == "unchanged" else "不明"
+            status = (
+                "更新" if action == "updated" else "変更なし" if action == "unchanged" else "不明"
+            )
             st.write(f"- {label}: {status} — {reason}")
 
         _render_line("どんな契約にしたいか", "desired_contract")
