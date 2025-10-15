@@ -374,6 +374,31 @@ def _get_client():
     return genai.Client(api_key=api_key)
 
 
+def gemini_healthcheck() -> tuple[bool, str]:
+    """Perform a minimal request to verify Gemini connectivity and model availability.
+
+    Returns (ok, message). The message is safe to show in UI logs.
+    """
+    try:
+        client = _get_client()
+        # Send a tiny prompt to the configured model
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents="ping",
+        )
+        feedback = getattr(response, "prompt_feedback", None)
+        if feedback and getattr(feedback, "block_reason", None):
+            return False, f"Blocked by safety: {feedback.block_reason}"
+        content = getattr(response, "text", None)
+        if not content:
+            return False, "Empty response"
+        return True, "OK"
+    except GeminiConfigError as exc:
+        return False, f"Config error: {exc}"
+    except Exception as exc:  # pragma: no cover - external API variations
+        return False, f"API error: {exc.__class__.__name__}: {exc}"
+
+
 def update_contract_sections_with_gemini(
     source_text: str,
     current_values: Dict[str, str],

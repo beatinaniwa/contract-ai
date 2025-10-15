@@ -13,6 +13,7 @@ from services.audit import save_audit_log
 from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
 from services.extractor import update_contract_sections_with_gemini
+from services.extractor import gemini_healthcheck
 from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
 from services.desired_contract import summarize_desired_contract
@@ -86,6 +87,14 @@ with col_right:
         height=260,
         key="source_text_widget",
     )
+    hc_col1, hc_col2 = st.columns([1, 1])
+    with hc_col1:
+        if st.button("Gemini接続チェック", use_container_width=True):
+            ok, msg = gemini_healthcheck()
+            if ok:
+                st.success("Gemini 2.5 Pro への接続はOKです。")
+            else:
+                st.error(f"Gemini接続に問題があります: {msg}")
     if st.button("AIでフォームに反映", type="primary", use_container_width=True):
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
@@ -671,8 +680,8 @@ with col_main:
                     maybe_expl = updated.get("explanation")
                     if isinstance(maybe_expl, dict):
                         explanation_for_ui = maybe_expl  # type: ignore[assignment]
-            except Exception:
-                gemini_error = "Gemini の呼び出しに失敗しました（APIキー/ネットワーク/ブロックなど）"
+            except Exception as exc:
+                gemini_error = f"Gemini の呼び出しに失敗: {exc.__class__.__name__}: {exc}"
                 sections = _parse_sections(base_dc)
                 for qa in answered_qas:
                     q = qa["question"]
