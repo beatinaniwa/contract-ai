@@ -275,9 +275,36 @@ with col_main:
             """
         )
 
-        # 初期テンプレート（未入力時のみ 1〜4 の番号をあらかじめ用意）
-        desired_contract_default = form_data.get("desired_contract", "").strip()
-        if not desired_contract_default:
+        # 初期テンプレート（未入力時は番号のみ）
+        def _strip_desired_titles(text: str) -> str:
+            """UI表示用に、長い説明タイトルを番号だけに置換する。
+
+            例: "1. 財活動上の目論見（…）" -> "1. "
+            箇条書き ("- …") や番号行に直接書かれた本文 ("1. 本文") は残す。
+            """
+            if not text:
+                return text
+            known_titles = {
+                "財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
+                "上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）",
+                "上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・)",
+            }
+            out_lines: list[str] = []
+            for ln in text.splitlines():
+                m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
+                if m:
+                    num = m.group(1)
+                    rest = m.group(2).strip()
+                    if rest in known_titles:
+                        out_lines.append(f"{num}. ")
+                        continue
+                out_lines.append(ln)
+            return "\n".join(out_lines)
+
+        desired_contract_default = (form_data.get("desired_contract", "") or "").strip()
+        if desired_contract_default:
+            desired_contract_default = _strip_desired_titles(desired_contract_default)
+        else:
             desired_contract_default = "\n".join(["1. ", "", "2. ", "", "3. ", "", "4. "]) + "\n"
 
         desired_contract = st.text_area(
