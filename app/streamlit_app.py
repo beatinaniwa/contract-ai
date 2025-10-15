@@ -85,6 +85,17 @@ if feedback:
     else:
         st.warning(message)
 
+# Q&A反映のフラッシュメッセージ
+qa_feedback = st.session_state.pop("qa_feedback", None)
+if qa_feedback:
+    qa_status, qa_message = qa_feedback
+    if qa_status == "success":
+        st.success(qa_message)
+    elif qa_status == "error":
+        st.error(qa_message)
+    else:
+        st.info(qa_message)
+
 
 def load_vocab():
     p = os.path.join(BASE_DIR, "policies", "vocab.yaml")
@@ -293,6 +304,7 @@ with col_main:
         "概要_当社の契約活動概要および成果事業化概要",
         value=our_overall_summary_default or "",
         height=100,
+        key="our_overall_summary_widget",
     )
 
     their_overall_summary_default = form_data.get("their_overall_summary")
@@ -307,6 +319,7 @@ with col_main:
         "概要_相手の契約活動概要および成果事業化概要",
         value=their_overall_summary_default or "",
         height=100,
+        key="their_overall_summary_widget",
     )
 
     # 「どんな契約にしたいか」のガイダンス（テキストエリアの外に説明を表示）
@@ -367,6 +380,7 @@ with col_main:
         value=desired_contract_default,
         height=300,
         help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
+        key="desired_contract_widget",
     )
 
     submitted = st.button("CSV出力", type="primary")
@@ -616,6 +630,16 @@ with col_main:
             if their_summary:
                 st.session_state["extracted"]["form"]["their_overall_summary"] = their_summary
 
+            # UIウィジェット（キー）にも即時反映
+            try:
+                st.session_state["desired_contract_widget"] = _strip_desired_titles(updated_dc)
+            except Exception:
+                st.session_state["desired_contract_widget"] = updated_dc
+            if our_summary is not None:
+                st.session_state["our_overall_summary_widget"] = our_summary
+            if their_summary is not None:
+                st.session_state["their_overall_summary_widget"] = their_summary
+
             # 汎用的なセクション解析（UI内ヘルパーを活用）
             def _sections_status(dc_text: str) -> Dict[int, bool]:
                 sec = _parse_sections(dc_text)
@@ -677,7 +701,33 @@ with col_main:
                 st.session_state["extracted"].pop("follow_up_questions", None)
                 st.session_state["qa_round"] = 0  # リセット
 
-            st.success("回答をフォームに反映しました。左側フォームの値が更新されます。")
+            # 反映の要約（Gemini吟味 or フォールバック）
+            eng = st.session_state.get("qa_update_engine", "gemini")
+            engine_label = "Gemini 2.5 Pro" if eng == "gemini" else "Gemini未使用のフォールバック"
+            def _stat_line(lbl: str, key: str) -> str:
+                info = (explanation_for_ui or {}).get(key, {}) if isinstance(explanation_for_ui, dict) else {}
+                action = info.get("action")
+                if not action:
+                    # 簡易推定
+                    before = base_dc if key == "desired_contract" else (
+                        form_data.get("our_overall_summary", "") if key == "our_overall_summary" else form_data.get("their_overall_summary", "")
+                    )
+                    after = updated_dc if key == "desired_contract" else (
+                        our_summary if key == "our_overall_summary" else their_summary
+                    )
+                    action = "updated" if (before or "") != (after or "") else "unchanged"
+                jp = "更新" if action == "updated" else "変更なし"
+                return f"{lbl}: {jp}"
+
+            summary_lines = [
+                _stat_line("どんな契約にしたいか", "desired_contract"),
+                _stat_line("概要_当社", "our_overall_summary"),
+                _stat_line("概要_相手", "their_overall_summary"),
+            ]
+            st.session_state["qa_feedback"] = (
+                "success",
+                f"{engine_label}で回答を吟味し、フォームへ反映しました。\n- " + "\n- ".join(summary_lines),
+            )
 
             if not next_questions:
                 st.info("必要な情報は十分に集まりました。追加の質問はありません。")
@@ -690,6 +740,12 @@ with col_main:
                     "qa_update_explanation", {}
                 )
                 st.session_state["qa_update_engine"] = "fallback"
+
+            # 値をキーへ反映済みのため、UIを即時更新
+            try:
+                getattr(st, "rerun")()
+            except Exception:
+                st.experimental_rerun()
 
     expl = st.session_state.get("qa_update_explanation")
     if expl:
