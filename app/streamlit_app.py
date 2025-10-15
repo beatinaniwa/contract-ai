@@ -281,21 +281,22 @@ with col_main:
 
             例: "1. 財活動上の目論見（…）" -> "1. "
             箇条書き ("- …") や番号行に直接書かれた本文 ("1. 本文") は残す。
+            生成側のバリエーションに対応するため、タイトル文はパターンで判定。
             """
             if not text:
                 return text
-            known_titles = {
-                "財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）",
-                "上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）",
-                "上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・)",
-            }
+            title_patterns = [
+                re.compile(r"^財活動上の目論見（.*）$"),
+                re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容（.*）$"),
+                re.compile(r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク（.*）$"),
+            ]
             out_lines: list[str] = []
             for ln in text.splitlines():
                 m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
                 if m:
                     num = m.group(1)
                     rest = m.group(2).strip()
-                    if rest in known_titles:
+                    if any(pat.match(rest) for pat in title_patterns):
                         out_lines.append(f"{num}. ")
                         continue
                 out_lines.append(ln)
