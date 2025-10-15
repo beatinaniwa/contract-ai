@@ -18,6 +18,7 @@ headers:
   - 契約相手_プロフィール
 
   - 概要_相手区分
+  - ソリューション技術企画室への相談有無
   - 概要_契約書式
   - 概要_関連契約
   - 概要_金額
@@ -53,6 +54,7 @@ fields:
   counterparty_profile: 契約相手_プロフィール
 
   counterparty_type: 概要_相手区分
+  solution_planning_office_consultation: ソリューション技術企画室への相談有無
   contract_form: 概要_契約書式
   related_contract_flag: 概要_関連契約
   amount_jpy: 概要_金額
