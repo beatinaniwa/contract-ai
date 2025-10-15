@@ -26,6 +26,10 @@ class ContractForm(BaseModel):
     counterparty_address: Optional[str] = Field(None, title="契約相手_所在地")
     counterparty_profile: Optional[str] = Field(None, title="契約相手_プロフィール")
     counterparty_type: Optional[Literal["民間", "大学", "先生（個人）", "国等・独立行政法人等", "その他"]] = Field(None, title="概要_相手区分")
+    # 概要_相手区分が 大学/先生（個人）/国等・独立行政法人等 の場合のみ表示・入力
+    solution_planning_office_consultation: Optional[Literal["未", "済"]] = Field(
+        None, title="ソリューション技術企画室への相談有無"
+    )
 
     contract_form: Optional[Literal["当社書式", "相手書式"]] = Field(None, title="概要_契約書式")
     # 概要_関連契約（選択式）

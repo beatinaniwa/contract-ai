@@ -13,6 +13,11 @@ related_contract_flag:
   - 該当なし
   - 該当あり
 
+# ソリューション技術企画室への相談有無
+solution_planning_office_consultation:
+  - 未
+  - 済
+
 disclosed_info_options:
   - 要求仕様
   - 関連技術情報

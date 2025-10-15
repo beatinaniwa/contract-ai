@@ -191,6 +191,24 @@ with col_main:
         counterparty_type = st.selectbox(
             "概要_相手区分", options=vocab["counterparty_type"], index=0
         )
+        # 条件付き表示: 大学/先生（個人）/国等・独立行政法人等 の場合のみ次の項目を表示
+        requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
+        if requires_solution_consult:
+            spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
+            default_spo = form_data.get("solution_planning_office_consultation")
+            spo_index = (
+                (spo_options.index(default_spo) if default_spo in spo_options else 0)
+                if isinstance(spo_options, list) and spo_options
+                else 0
+            )
+            solution_planning_office_consultation = st.selectbox(
+                "ソリューション技術企画室への相談有無",
+                options=spo_options or ["未", "済"],
+                index=spo_index,
+            )
+        else:
+            # 非対象の場合は空文字列
+            solution_planning_office_consultation = ""
 
         contract_form = st.selectbox("概要_契約書式", options=vocab["contract_form"], index=0)
         related_contract_flag = st.selectbox(
@@ -351,6 +369,9 @@ with col_main:
             counterparty_address=counterparty_address or None,
             counterparty_profile=counterparty_profile or None,
             counterparty_type=counterparty_type or None,
+            solution_planning_office_consultation=(
+                solution_planning_office_consultation or None
+            ),
             contract_form=contract_form or None,
             related_contract_flag=related_flag,
             amount_jpy=amount_jpy or None,
