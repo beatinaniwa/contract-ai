@@ -28,8 +28,10 @@ if "source_text_widget" not in st.session_state:
 
 st.session_state.setdefault("uploaded_file_digest", None)
 
-with st.sidebar:
-    st.header("会話入力")
+col_left, col_right = st.columns([2, 1])
+
+with col_right:
+    st.header("AIサポート")
     uploaded_file = st.file_uploader(
         "案件の概要や条件のファイルをアップロード",
         type=["pdf", "txt"],
@@ -62,7 +64,7 @@ with st.sidebar:
         height=260,
         key="source_text_widget",
     )
-    if st.button("抽出する", type="primary", use_container_width=True):
+    if st.button("AIでフォームに反映", type="primary", use_container_width=True):
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
@@ -91,7 +93,7 @@ def load_vocab():
 
 vocab = load_vocab()
 
-col_main = st.container()
+col_main = col_left
 
 with col_main:
     st.subheader("フォーム（編集可）")
@@ -425,7 +427,17 @@ with col_main:
         )
         ok, missing = validate_form(cf)
         if not ok:
-            st.error(f"必須項目が未入力です: {', '.join(missing)}")
+            def _to_japanese_labels(keys: list[str]) -> list[str]:
+                try:
+                    with open(MAPPING, "r", encoding="utf-8") as f_yaml:
+                        mapping = yaml.safe_load(f_yaml) or {}
+                    field_map = mapping.get("fields", {}) if isinstance(mapping, dict) else {}
+                    return [field_map.get(k, k) for k in keys]
+                except Exception:
+                    return keys
+
+            labels = _to_japanese_labels(missing)
+            st.error(f"必須項目が未入力です: {', '.join(labels)}")
         else:
             out_path = write_csv(
                 cf.model_dump(), MAPPING, out_dir=os.path.join(os.getcwd(), "outputs")
