@@ -64,7 +64,7 @@ with col_right:
         height=260,
         key="source_text_widget",
     )
-    if st.button("抽出する", type="primary", use_container_width=True):
+    if st.button("AIでフォームに反映", type="primary", use_container_width=True):
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
