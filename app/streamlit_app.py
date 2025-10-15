@@ -438,10 +438,10 @@ with col_main:
 
             labels = _to_japanese_labels(missing)
             st.error(f"必須項目が未入力です: {', '.join(labels)}")
-            else:
-                out_path = write_csv(
-                    cf.model_dump(), MAPPING, out_dir=os.path.join(os.getcwd(), "outputs")
-                )
+        else:
+            out_path = write_csv(
+                cf.model_dump(), MAPPING, out_dir=os.path.join(os.getcwd(), "outputs")
+            )
             st.success("CSVを生成しました。")
             with open(out_path, "rb") as f_bin:
                 st.download_button(
