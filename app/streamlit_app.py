@@ -28,8 +28,10 @@ if "source_text_widget" not in st.session_state:
 
 st.session_state.setdefault("uploaded_file_digest", None)
 
-with st.sidebar:
-    st.header("会話入力")
+col_left, col_right = st.columns([2, 1])
+
+with col_right:
+    st.header("AIサポート")
     uploaded_file = st.file_uploader(
         "案件の概要や条件のファイルをアップロード",
         type=["pdf", "txt"],
@@ -91,7 +93,7 @@ def load_vocab():
 
 vocab = load_vocab()
 
-col_main = st.container()
+col_main = col_left
 
 with col_main:
     st.subheader("フォーム（編集可）")
