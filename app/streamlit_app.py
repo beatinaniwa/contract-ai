@@ -102,271 +102,271 @@ with col_main:
 
     # 動的フォーム
     # 入力ウィジェット（フォームを使わずリアクティブに）
-        # 基本情報
-        request_date = st.date_input(
-            "依頼日", value=form_data.get("request_date") or _dt_date.today()
-        )
-        normal_due_date = st.date_input(
-            "通常納期",
-            value=form_data.get("normal_due_date")
-            or form_data.get("desired_due_date")
-            or _dt_date.today(),
-        )
-        requester_department = st.text_input(
-            "依頼者_所属", value=form_data.get("requester_department", "")
-        )
-        requester_manager = st.text_input(
-            "依頼者_責任者", value=form_data.get("requester_manager", "")
-        )
-        requester_staff = st.text_input("依頼者_担当者", value=form_data.get("requester_staff", ""))
+    # 基本情報
+    request_date = st.date_input(
+        "依頼日", value=form_data.get("request_date") or _dt_date.today()
+    )
+    normal_due_date = st.date_input(
+        "通常納期",
+        value=form_data.get("normal_due_date")
+        or form_data.get("desired_due_date")
+        or _dt_date.today(),
+    )
+    requester_department = st.text_input(
+        "依頼者_所属", value=form_data.get("requester_department", "")
+    )
+    requester_manager = st.text_input(
+        "依頼者_責任者", value=form_data.get("requester_manager", "")
+    )
+    requester_staff = st.text_input("依頼者_担当者", value=form_data.get("requester_staff", ""))
 
-        # 案件_種別（最初に追加）
-        project_type_options = vocab.get("project_type", [])
-        default_project_type = form_data.get("project_type")
-        project_type_index = (
-            (
-                project_type_options.index(default_project_type)
-                if default_project_type in project_type_options
-                else 0
-            )
-            if project_type_options
+    # 案件_種別（最初に追加）
+    project_type_options = vocab.get("project_type", [])
+    default_project_type = form_data.get("project_type")
+    project_type_index = (
+        (
+            project_type_options.index(default_project_type)
+            if default_project_type in project_type_options
             else 0
         )
-        project_type = st.selectbox(
-            "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
-        )
+        if project_type_options
+        else 0
+    )
+    project_type = st.selectbox(
+        "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
+    )
 
-        # 案件_国内外（2番目）
-        project_domestic_foreign_options = vocab.get("project_domestic_foreign", [])
-        default_pdf = form_data.get("project_domestic_foreign")
-        pdf_index = (
-            (
-                project_domestic_foreign_options.index(default_pdf)
-                if default_pdf in project_domestic_foreign_options
-                else 0
-            )
-            if project_domestic_foreign_options
+    # 案件_国内外（2番目）
+    project_domestic_foreign_options = vocab.get("project_domestic_foreign", [])
+    default_pdf = form_data.get("project_domestic_foreign")
+    pdf_index = (
+        (
+            project_domestic_foreign_options.index(default_pdf)
+            if default_pdf in project_domestic_foreign_options
             else 0
         )
-        project_domestic_foreign = st.selectbox(
-            "案件_国内外",
-            options=project_domestic_foreign_options or ["国内"],
-            index=pdf_index,
-        )
+        if project_domestic_foreign_options
+        else 0
+    )
+    project_domestic_foreign = st.selectbox(
+        "案件_国内外",
+        options=project_domestic_foreign_options or ["国内"],
+        index=pdf_index,
+    )
 
-        project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
-        activity_purpose = st.text_area(
-            "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
-        )
-        activity_start = st.text_input("案件_実活動時期", value=form_data.get("activity_start", ""))
+    project_name = st.text_input("案件_案件名", value=form_data.get("project_name", ""))
+    activity_purpose = st.text_area(
+        "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80
+    )
+    activity_start = st.text_input("案件_実活動時期", value=form_data.get("activity_start", ""))
 
-        # 契約対象品目（単一選択）
-        project_target_item_options = vocab.get(
-            "project_target_item", ["ハード", "ソフト", "技術", "役務", "その他"]
-        )
-        default_target_raw = form_data.get("project_target_item") or form_data.get(
-            "target_item_name"
-        )
-        if default_target_raw in project_target_item_options:
-            project_target_item_index = project_target_item_options.index(default_target_raw)
-        elif default_target_raw and "その他" in project_target_item_options:
-            project_target_item_index = project_target_item_options.index("その他")
-        else:
-            project_target_item_index = 0
-        project_target_item = st.selectbox(
-            "契約対象品目",
-            options=project_target_item_options,
-            index=project_target_item_index,
-        )
+    # 契約対象品目（単一選択）
+    project_target_item_options = vocab.get(
+        "project_target_item", ["ハード", "ソフト", "技術", "役務", "その他"]
+    )
+    default_target_raw = form_data.get("project_target_item") or form_data.get(
+        "target_item_name"
+    )
+    if default_target_raw in project_target_item_options:
+        project_target_item_index = project_target_item_options.index(default_target_raw)
+    elif default_target_raw and "その他" in project_target_item_options:
+        project_target_item_index = project_target_item_options.index("その他")
+    else:
+        project_target_item_index = 0
+    project_target_item = st.selectbox(
+        "契約対象品目",
+        options=project_target_item_options,
+        index=project_target_item_index,
+    )
 
-        counterparty_name = st.text_input(
-            "契約相手_名称", value=form_data.get("counterparty_name", "")
-        )
-        counterparty_address = st.text_input(
-            "契約相手_所在地", value=form_data.get("counterparty_address", "")
-        )
-        counterparty_profile = st.text_area(
-            "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80
-        )
-        # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
-        counterparty_type_options = vocab.get("counterparty_type", [])
-        default_counterparty_type = form_data.get("counterparty_type")
-        ct_index = (
-            (
-                counterparty_type_options.index(default_counterparty_type)
-                if default_counterparty_type in counterparty_type_options
-                else 0
-            )
-            if counterparty_type_options
+    counterparty_name = st.text_input(
+        "契約相手_名称", value=form_data.get("counterparty_name", "")
+    )
+    counterparty_address = st.text_input(
+        "契約相手_所在地", value=form_data.get("counterparty_address", "")
+    )
+    counterparty_profile = st.text_area(
+        "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80
+    )
+    # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
+    counterparty_type_options = vocab.get("counterparty_type", [])
+    default_counterparty_type = form_data.get("counterparty_type")
+    ct_index = (
+        (
+            counterparty_type_options.index(default_counterparty_type)
+            if default_counterparty_type in counterparty_type_options
             else 0
         )
-        counterparty_type = st.selectbox(
-            "概要_相手区分",
-            options=counterparty_type_options or ["民間"],
-            index=ct_index,
-        )
-        requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
-        if requires_solution_consult:
-            spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
-            default_spo = form_data.get("solution_planning_office_consultation")
-            spo_index = (
-                (spo_options.index(default_spo) if default_spo in spo_options else 0)
-                if isinstance(spo_options, list) and spo_options
-                else 0
-            )
-            solution_planning_office_consultation = st.selectbox(
-                "ソリューション技術企画室への相談有無",
-                options=spo_options or ["未", "済"],
-                index=spo_index,
-            )
-        else:
-            solution_planning_office_consultation = ""
-
-        contract_form_options = vocab.get("contract_form", ["当社書式", "相手書式"])
-        default_contract_form = form_data.get("contract_form")
-        cf_index = (
-            (
-                contract_form_options.index(default_contract_form)
-                if default_contract_form in contract_form_options
-                else 0
-            )
-            if contract_form_options
+        if counterparty_type_options
+        else 0
+    )
+    counterparty_type = st.selectbox(
+        "概要_相手区分",
+        options=counterparty_type_options or ["民間"],
+        index=ct_index,
+    )
+    requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
+    if requires_solution_consult:
+        spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
+        default_spo = form_data.get("solution_planning_office_consultation")
+        spo_index = (
+            (spo_options.index(default_spo) if default_spo in spo_options else 0)
+            if isinstance(spo_options, list) and spo_options
             else 0
         )
-        contract_form = st.selectbox(
-            "概要_契約書式", options=contract_form_options, index=cf_index
+        solution_planning_office_consultation = st.selectbox(
+            "ソリューション技術企画室への相談有無",
+            options=spo_options or ["未", "済"],
+            index=spo_index,
         )
-        related_contract_flag = st.selectbox(
-            "概要_関連契約",
-            options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
-            index=0,
+    else:
+        solution_planning_office_consultation = ""
+
+    contract_form_options = vocab.get("contract_form", ["当社書式", "相手書式"])
+    default_contract_form = form_data.get("contract_form")
+    cf_index = (
+        (
+            contract_form_options.index(default_contract_form)
+            if default_contract_form in contract_form_options
+            else 0
         )
+        if contract_form_options
+        else 0
+    )
+    contract_form = st.selectbox(
+        "概要_契約書式", options=contract_form_options, index=cf_index
+    )
+    related_contract_flag = st.selectbox(
+        "概要_関連契約",
+        options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
+        index=0,
+    )
 
-        amount_jpy = st.number_input(
-            "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0))
-        )
+    amount_jpy = st.number_input(
+        "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0))
+    )
 
-        # 開示される情報
-        info_options = vocab.get(
-            "disclosed_info_options",
-            ["要求仕様", "関連技術情報", "図面", "サンプル"],
-        )
-        info_from_us: List[str] = st.multiselect(
-            "概要_開示される情報_当社から",
-            options=info_options,
-            default=form_data.get("info_from_us", []),
-        )
-        info_from_us_other = st.text_input(
-            "概要_開示される情報_当社から_その他",
-            value=form_data.get("info_from_us_other", ""),
-            placeholder="他に開示予定があれば記入（空でも可）",
-            help="選択肢にない開示事項があれば1行で記入。未入力可。",
-            key="info_from_us_other",
-        )
+    # 開示される情報
+    info_options = vocab.get(
+        "disclosed_info_options",
+        ["要求仕様", "関連技術情報", "図面", "サンプル"],
+    )
+    info_from_us: List[str] = st.multiselect(
+        "概要_開示される情報_当社から",
+        options=info_options,
+        default=form_data.get("info_from_us", []),
+    )
+    info_from_us_other = st.text_input(
+        "概要_開示される情報_当社から_その他",
+        value=form_data.get("info_from_us_other", ""),
+        placeholder="他に開示予定があれば記入（空でも可）",
+        help="選択肢にない開示事項があれば1行で記入。未入力可。",
+        key="info_from_us_other",
+    )
 
-        info_from_them: List[str] = st.multiselect(
-            "概要_開示される情報_相手から",
-            options=info_options,
-            default=form_data.get("info_from_them", []),
-        )
-        info_from_them_other = st.text_input(
-            "概要_開示される情報_相手から_その他",
-            value=form_data.get("info_from_them_other", ""),
-            placeholder="他に相手からの開示があれば記入（空でも可）",
-            help="選択肢にない相手からの開示事項があれば1行で記入。未入力可。",
-            key="info_from_them_other",
-        )
+    info_from_them: List[str] = st.multiselect(
+        "概要_開示される情報_相手から",
+        options=info_options,
+        default=form_data.get("info_from_them", []),
+    )
+    info_from_them_other = st.text_input(
+        "概要_開示される情報_相手から_その他",
+        value=form_data.get("info_from_them_other", ""),
+        placeholder="他に相手からの開示があれば記入（空でも可）",
+        help="選択肢にない相手からの開示事項があれば1行で記入。未入力可。",
+        key="info_from_them_other",
+    )
 
-        our_overall_summary_default = form_data.get("our_overall_summary")
-        if not our_overall_summary_default:
-            # 旧フィールドからの統合
-            parts = [
-                form_data.get("our_activity_summary", "").strip(),
-                form_data.get("our_productization_summary", "").strip(),
-            ]
-            parts = [p for p in parts if p]
-            our_overall_summary_default = "\n".join(parts)
-        our_overall_summary = st.text_area(
-            "概要_当社の契約活動概要および成果事業化概要",
-            value=our_overall_summary_default or "",
-            height=100,
-        )
+    our_overall_summary_default = form_data.get("our_overall_summary")
+    if not our_overall_summary_default:
+        # 旧フィールドからの統合
+        parts = [
+            form_data.get("our_activity_summary", "").strip(),
+            form_data.get("our_productization_summary", "").strip(),
+        ]
+        parts = [p for p in parts if p]
+        our_overall_summary_default = "\n".join(parts)
+    our_overall_summary = st.text_area(
+        "概要_当社の契約活動概要および成果事業化概要",
+        value=our_overall_summary_default or "",
+        height=100,
+    )
 
-        their_overall_summary_default = form_data.get("their_overall_summary")
-        if not their_overall_summary_default:
-            parts = [
-                form_data.get("their_activity_summary", "").strip(),
-                form_data.get("their_productization_summary", "").strip(),
-            ]
-            parts = [p for p in parts if p]
-            their_overall_summary_default = "\n".join(parts)
-        their_overall_summary = st.text_area(
-            "概要_相手の契約活動概要および成果事業化概要",
-            value=their_overall_summary_default or "",
-            height=100,
-        )
+    their_overall_summary_default = form_data.get("their_overall_summary")
+    if not their_overall_summary_default:
+        parts = [
+            form_data.get("their_activity_summary", "").strip(),
+            form_data.get("their_productization_summary", "").strip(),
+        ]
+        parts = [p for p in parts if p]
+        their_overall_summary_default = "\n".join(parts)
+    their_overall_summary = st.text_area(
+        "概要_相手の契約活動概要および成果事業化概要",
+        value=their_overall_summary_default or "",
+        height=100,
+    )
 
-        # 「どんな契約にしたいか」のガイダンス（テキストエリアの外に説明を表示）
-        st.markdown(
-            """
-            どんな契約にしたいか（記入ガイド）
+    # 「どんな契約にしたいか」のガイダンス（テキストエリアの外に説明を表示）
+    st.markdown(
+        """
+        どんな契約にしたいか（記入ガイド）
 
-            1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
-            2. 生じ得る知財（発明/意匠/商標/ソフト等）とその性質（単独/共有）
-            3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）
-            4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）
-            """
-        )
+        1. 財活動上の目論見（知財創出/権利化/ライセンス/知財売買/知財保証/・・・）
+        2. 生じ得る知財（発明/意匠/商標/ソフト等）とその性質（単独/共有）
+        3. 上記2. に関する事業上の実施や許諾の内容（当社製品が実施品/当社と取引後の相手や顧客の製品が実施品/取引の前後に関係なく双方の製品が実施品/・・・）
+        4. 上記1. および2. から生じ得る上記3. や知財上のリスク（自己実施上の支障/第三者による実施/コンタミによる出願上の支障/第三者からの権利行使/実施料の発生/・・・）
+        """
+    )
 
-        # 初期テンプレート（未入力時は番号のみ）
-        def _strip_desired_titles(text: str) -> str:
-            """UI表示用に、長い説明タイトルを番号だけに置換する。
+    # 初期テンプレート（未入力時は番号のみ）
+    def _strip_desired_titles(text: str) -> str:
+        """UI表示用に、長い説明タイトルを番号だけに置換する。
 
-            例: "1. 財活動上の目論見（…）" -> "1. "
-            箇条書き ("- …") や番号行に直接書かれた本文 ("1. 本文") は残す。
-            生成側のバリエーションに対応するため、タイトル文はパターンで判定。
-            """
-            if not text:
-                return text
-            title_patterns = [
-                # バリエーション: 財/知財 活動上の目論見（当社/相手方/相手/先方）
-                re.compile(r"^(?:財活動上|知財活動上)の目論見[（(].*[）)]$"),
-                re.compile(r"^(?:当社の)?知財活動上の目論見[（(].*[）)]$"),
-                re.compile(r"^(?:(?:相手方|相手|先方)の)?知財活動上の目論見[（(].*[）)]$"),
-                # 2. の正式タイトル
-                re.compile(r"^生じ得る知財[（(].*[）)]とその性質[（(].*[）)]$"),
-                # 3. と 4. の見出し
-                re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容[（(].*[）)]$"),
-                re.compile(
-                    r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"
-                ),
-            ]
-            out_lines: list[str] = []
-            for ln in text.splitlines():
-                m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
-                if m:
-                    num = m.group(1)
-                    rest = m.group(2).strip()
-                    if any(pat.match(rest) for pat in title_patterns):
-                        out_lines.append(f"{num}. ")
-                        continue
-                out_lines.append(ln)
-            return "\n".join(out_lines)
+        例: "1. 財活動上の目論見（…）" -> "1. "
+        箇条書き ("- …") や番号行に直接書かれた本文 ("1. 本文") は残す。
+        生成側のバリエーションに対応するため、タイトル文はパターンで判定。
+        """
+        if not text:
+            return text
+        title_patterns = [
+            # バリエーション: 財/知財 活動上の目論見（当社/相手方/相手/先方）
+            re.compile(r"^(?:財活動上|知財活動上)の目論見[（(].*[）)]$"),
+            re.compile(r"^(?:当社の)?知財活動上の目論見[（(].*[）)]$"),
+            re.compile(r"^(?:(?:相手方|相手|先方)の)?知財活動上の目論見[（(].*[）)]$"),
+            # 2. の正式タイトル
+            re.compile(r"^生じ得る知財[（(].*[）)]とその性質[（(].*[）)]$"),
+            # 3. と 4. の見出し
+            re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容[（(].*[）)]$"),
+            re.compile(
+                r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"
+            ),
+        ]
+        out_lines: list[str] = []
+        for ln in text.splitlines():
+            m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
+            if m:
+                num = m.group(1)
+                rest = m.group(2).strip()
+                if any(pat.match(rest) for pat in title_patterns):
+                    out_lines.append(f"{num}. ")
+                    continue
+            out_lines.append(ln)
+        return "\n".join(out_lines)
 
-        desired_contract_default = (form_data.get("desired_contract", "") or "").strip()
-        if desired_contract_default:
-            desired_contract_default = _strip_desired_titles(desired_contract_default)
-        else:
-            desired_contract_default = "\n".join(["1. ", "", "2. ", "", "3. ", "", "4. "]) + "\n"
+    desired_contract_default = (form_data.get("desired_contract", "") or "").strip()
+    if desired_contract_default:
+        desired_contract_default = _strip_desired_titles(desired_contract_default)
+    else:
+        desired_contract_default = "\n".join(["1. ", "", "2. ", "", "3. ", "", "4. "]) + "\n"
 
-        desired_contract = st.text_area(
-            "どんな契約にしたいか",
-            value=desired_contract_default,
-            height=300,
-            help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
-        )
+    desired_contract = st.text_area(
+        "どんな契約にしたいか",
+        value=desired_contract_default,
+        height=300,
+        help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
+    )
 
-        submitted = st.button("CSV出力", type="primary")
+    submitted = st.button("CSV出力", type="primary")
 
     if submitted:
         # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
