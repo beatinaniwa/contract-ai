@@ -100,50 +100,8 @@ with col_main:
     extracted = st.session_state.get("extracted", {"form": {}, "missing_fields": []})
     form_data = extracted.get("form", {})
 
-    # 相手区分と条件付き項目（フォーム外でリアクティブに表示）
-    counterparty_type_options = vocab.get("counterparty_type", [])
-    default_counterparty_type = form_data.get("counterparty_type")
-    ct_index = (
-        (
-            counterparty_type_options.index(default_counterparty_type)
-            if default_counterparty_type in counterparty_type_options
-            else 0
-        )
-        if counterparty_type_options
-        else 0
-    )
-    # 初期値をセッションに保持（キーが未定義の場合のみ）
-    if "ui_counterparty_type" not in st.session_state:
-        st.session_state["ui_counterparty_type"] = (
-            default_counterparty_type
-            if default_counterparty_type in counterparty_type_options
-            else (counterparty_type_options[0] if counterparty_type_options else "")
-        )
-    counterparty_type = st.selectbox(
-        "概要_相手区分",
-        options=counterparty_type_options or ["民間"],
-        index=ct_index,
-        key="ui_counterparty_type",
-    )
-
-    requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
-    if requires_solution_consult:
-        spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
-        default_spo = form_data.get("solution_planning_office_consultation")
-        if "ui_spo_consult" not in st.session_state and default_spo in (spo_options or []):
-            st.session_state["ui_spo_consult"] = default_spo
-        st.selectbox(
-            "ソリューション技術企画室への相談有無",
-            options=spo_options or ["未", "済"],
-            index=(spo_options.index(default_spo) if (isinstance(spo_options, list) and default_spo in spo_options) else 0),
-            key="ui_spo_consult",
-        )
-    else:
-        # 非対象ではUIを出さず、値は None 扱いにする
-        st.session_state.pop("ui_spo_consult", None)
-
     # 動的フォーム
-    with st.form("contract_form"):
+    # 入力ウィジェット（フォームを使わずリアクティブに）
         # 基本情報
         request_date = st.date_input(
             "依頼日", value=form_data.get("request_date") or _dt_date.today()
@@ -230,9 +188,54 @@ with col_main:
         counterparty_profile = st.text_area(
             "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80
         )
+        # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
+        counterparty_type_options = vocab.get("counterparty_type", [])
+        default_counterparty_type = form_data.get("counterparty_type")
+        ct_index = (
+            (
+                counterparty_type_options.index(default_counterparty_type)
+                if default_counterparty_type in counterparty_type_options
+                else 0
+            )
+            if counterparty_type_options
+            else 0
+        )
+        counterparty_type = st.selectbox(
+            "概要_相手区分",
+            options=counterparty_type_options or ["民間"],
+            index=ct_index,
+        )
+        requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
+        if requires_solution_consult:
+            spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
+            default_spo = form_data.get("solution_planning_office_consultation")
+            spo_index = (
+                (spo_options.index(default_spo) if default_spo in spo_options else 0)
+                if isinstance(spo_options, list) and spo_options
+                else 0
+            )
+            solution_planning_office_consultation = st.selectbox(
+                "ソリューション技術企画室への相談有無",
+                options=spo_options or ["未", "済"],
+                index=spo_index,
+            )
+        else:
+            solution_planning_office_consultation = ""
 
-
-        contract_form = st.selectbox("概要_契約書式", options=vocab["contract_form"], index=0)
+        contract_form_options = vocab.get("contract_form", ["当社書式", "相手書式"])
+        default_contract_form = form_data.get("contract_form")
+        cf_index = (
+            (
+                contract_form_options.index(default_contract_form)
+                if default_contract_form in contract_form_options
+                else 0
+            )
+            if contract_form_options
+            else 0
+        )
+        contract_form = st.selectbox(
+            "概要_契約書式", options=contract_form_options, index=cf_index
+        )
         related_contract_flag = st.selectbox(
             "概要_関連契約",
             options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
@@ -363,7 +366,7 @@ with col_main:
             help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
         )
 
-        submitted = st.form_submit_button("CSV出力", type="primary")
+        submitted = st.button("CSV出力", type="primary")
 
     if submitted:
         # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
@@ -375,14 +378,6 @@ with col_main:
         related_flag: Literal["該当なし", "該当あり"] = cast(
             Literal["該当なし", "該当あり"], raw_related_flag
         )
-        # 状態から相手区分/相談有無を確定
-        ui_ct = st.session_state.get("ui_counterparty_type")
-        ui_spo = (
-            st.session_state.get("ui_spo_consult")
-            if ui_ct in {"大学", "先生（個人）", "国等・独立行政法人等"}
-            else None
-        )
-
         cf = ContractForm(
             request_date=request_date or None,
             normal_due_date=normal_due_date or None,
@@ -398,8 +393,8 @@ with col_main:
             counterparty_name=counterparty_name or None,
             counterparty_address=counterparty_address or None,
             counterparty_profile=counterparty_profile or None,
-            counterparty_type=ui_ct or None,
-            solution_planning_office_consultation=(ui_spo or None),
+            counterparty_type=counterparty_type or None,
+            solution_planning_office_consultation=(solution_planning_office_consultation or None),
             contract_form=contract_form or None,
             related_contract_flag=related_flag,
             amount_jpy=amount_jpy or None,
