@@ -311,7 +311,7 @@ with col_main:
         desired_contract = st.text_area(
             "どんな契約にしたいか",
             value=desired_contract_default,
-            height=160,
+            height=300,
             help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
         )
 
