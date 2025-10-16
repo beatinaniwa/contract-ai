@@ -11,6 +11,7 @@ from typing import List, Dict
 
 from models.schemas import ContractForm
 from services.audit import save_audit_log
+from services.basic_auth import require_basic_auth
 from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
 from services.extractor import update_contract_sections_with_gemini
@@ -71,6 +72,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
 
 st.set_page_config(page_title="契約書作成アシスタント", layout="wide")
+
+require_basic_auth()
+
 st.title("契約書作成アシスタント")
 
 if "source_text_widget" not in st.session_state:
