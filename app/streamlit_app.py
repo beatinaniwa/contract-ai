@@ -198,29 +198,23 @@ with col_main:
     # 動的フォーム
     # 入力ウィジェット（フォームを使わずリアクティブに）
     # 基本情報
-    request_date = st.date_input(
-        "依頼日", value=form_data.get("request_date") or _dt_date.today(), key="request_date_widget"
+    def _ensure_default(key: str, default):
+        if key not in st.session_state:
+            st.session_state[key] = default
+
+    _ensure_default("request_date_widget", form_data.get("request_date") or _dt_date.today())
+    _ensure_default(
+        "normal_due_date_widget",
+        form_data.get("normal_due_date") or form_data.get("desired_due_date") or _dt_date.today(),
     )
-    normal_due_date = st.date_input(
-        "通常納期",
-        value=form_data.get("normal_due_date")
-        or form_data.get("desired_due_date")
-        or _dt_date.today(),
-        key="normal_due_date_widget",
-    )
-    requester_department = st.text_input(
-        "依頼者_所属",
-        value=form_data.get("requester_department", ""),
-        key="requester_department_widget",
-    )
-    requester_manager = st.text_input(
-        "依頼者_責任者",
-        value=form_data.get("requester_manager", ""),
-        key="requester_manager_widget",
-    )
-    requester_staff = st.text_input(
-        "依頼者_担当者", value=form_data.get("requester_staff", ""), key="requester_staff_widget"
-    )
+    request_date = st.date_input("依頼日", key="request_date_widget")
+    normal_due_date = st.date_input("通常納期", key="normal_due_date_widget")
+    _ensure_default("requester_department_widget", form_data.get("requester_department", ""))
+    requester_department = st.text_input("依頼者_所属", key="requester_department_widget")
+    _ensure_default("requester_manager_widget", form_data.get("requester_manager", ""))
+    requester_manager = st.text_input("依頼者_責任者", key="requester_manager_widget")
+    _ensure_default("requester_staff_widget", form_data.get("requester_staff", ""))
+    requester_staff = st.text_input("依頼者_担当者", key="requester_staff_widget")
 
     # 案件_種別（最初に追加）
     project_type_options = vocab.get("project_type", [])
@@ -256,18 +250,12 @@ with col_main:
         index=pdf_index,
     )
 
-    project_name = st.text_input(
-        "案件_案件名", value=form_data.get("project_name", ""), key="project_name_widget"
-    )
-    activity_purpose = st.text_area(
-        "案件_活動目的",
-        value=form_data.get("activity_purpose", ""),
-        height=80,
-        key="activity_purpose_widget",
-    )
-    activity_start = st.text_input(
-        "案件_実活動時期", value=form_data.get("activity_start", ""), key="activity_start_widget"
-    )
+    _ensure_default("project_name_widget", form_data.get("project_name", ""))
+    project_name = st.text_input("案件_案件名", key="project_name_widget")
+    _ensure_default("activity_purpose_widget", form_data.get("activity_purpose", ""))
+    activity_purpose = st.text_area("案件_活動目的", height=80, key="activity_purpose_widget")
+    _ensure_default("activity_start_widget", form_data.get("activity_start", ""))
+    activity_start = st.text_input("案件_実活動時期", key="activity_start_widget")
 
     # 契約対象品目（単一選択）
     project_target_item_options = vocab.get(
@@ -286,22 +274,12 @@ with col_main:
         index=project_target_item_index,
     )
 
-    counterparty_name = st.text_input(
-        "契約相手_名称",
-        value=form_data.get("counterparty_name", ""),
-        key="counterparty_name_widget",
-    )
-    counterparty_address = st.text_input(
-        "契約相手_所在地",
-        value=form_data.get("counterparty_address", ""),
-        key="counterparty_address_widget",
-    )
-    counterparty_profile = st.text_area(
-        "契約相手_プロフィール",
-        value=form_data.get("counterparty_profile", ""),
-        height=80,
-        key="counterparty_profile_widget",
-    )
+    _ensure_default("counterparty_name_widget", form_data.get("counterparty_name", ""))
+    counterparty_name = st.text_input("契約相手_名称", key="counterparty_name_widget")
+    _ensure_default("counterparty_address_widget", form_data.get("counterparty_address", ""))
+    counterparty_address = st.text_input("契約相手_所在地", key="counterparty_address_widget")
+    _ensure_default("counterparty_profile_widget", form_data.get("counterparty_profile", ""))
+    counterparty_profile = st.text_area("契約相手_プロフィール", height=80, key="counterparty_profile_widget")
     # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
     counterparty_type_options = vocab.get("counterparty_type", [])
     default_counterparty_type = form_data.get("counterparty_type")
@@ -358,13 +336,8 @@ with col_main:
         index=0,
     )
 
-    amount_jpy = st.number_input(
-        "概要_金額",
-        min_value=0,
-        step=1000,
-        value=int(form_data.get("amount_jpy", 0)),
-        key="amount_jpy_widget",
-    )
+    _ensure_default("amount_jpy_widget", int(form_data.get("amount_jpy", 0)))
+    amount_jpy = st.number_input("概要_金額", min_value=0, step=1000, key="amount_jpy_widget")
 
     # 開示される情報
     info_options = vocab.get(
@@ -406,9 +379,9 @@ with col_main:
         ]
         parts = [p for p in parts if p]
         our_overall_summary_default = "\n".join(parts)
+    _ensure_default("our_overall_summary_widget", our_overall_summary_default or "")
     our_overall_summary = st.text_area(
         "概要_当社の契約活動概要および成果事業化概要",
-        value=our_overall_summary_default or "",
         height=100,
         key="our_overall_summary_widget",
     )
@@ -421,9 +394,9 @@ with col_main:
         ]
         parts = [p for p in parts if p]
         their_overall_summary_default = "\n".join(parts)
+    _ensure_default("their_overall_summary_widget", their_overall_summary_default or "")
     their_overall_summary = st.text_area(
         "概要_相手の契約活動概要および成果事業化概要",
-        value=their_overall_summary_default or "",
         height=100,
         key="their_overall_summary_widget",
     )
@@ -491,10 +464,10 @@ with col_main:
         desired_contract_default = _strip_desired_titles(desired_contract_default)
     else:
         desired_contract_default = "\n".join(["1. ", "", "2. ", "", "3. ", "", "4. "]) + "\n"
+    _ensure_default("desired_contract_widget", desired_contract_default)
 
     desired_contract = st.text_area(
         "どんな契約にしたいか",
-        value=desired_contract_default,
         height=300,
         help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
         key="desired_contract_widget",
