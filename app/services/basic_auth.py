@@ -146,6 +146,19 @@ def _is_session_authenticated() -> bool:
     return bool(st.session_state.get(_SESSION_AUTH_FLAG))
 
 
+def _trigger_rerun() -> None:
+    if st is None:
+        return
+    try:
+        if hasattr(st, "rerun"):
+            st.rerun()
+        elif hasattr(st, "experimental_rerun"):
+            st.experimental_rerun()
+    except Exception:
+        # Ignore rerun errors; the existing run will finish and proceed.
+        pass
+
+
 def render_login_form(config: BasicAuthConfig) -> bool:
     """Show a simple login form when running without an Authorization header."""
     if st is None:
@@ -175,6 +188,7 @@ def render_login_form(config: BasicAuthConfig) -> bool:
         _mark_session_authenticated()
         st.session_state.pop(_SESSION_ERROR_FLAG, None)
         message_box.success("認証に成功しました。")
+        _trigger_rerun()
         return True
 
     error_message = "ID またはパスワードが違います。"

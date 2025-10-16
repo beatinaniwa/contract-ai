@@ -127,6 +127,7 @@ class DummyStreamlit:
         self.username_response = ""
         self.password_response = ""
         self.submit_response = False
+        self.rerun_called = False
 
     def empty(self):
         return DummyPlaceholder(self._messages)
@@ -141,6 +142,12 @@ class DummyStreamlit:
 
     def form_submit_button(self, label):
         return self.submit_response
+
+    def rerun(self):
+        self.rerun_called = True
+
+    def experimental_rerun(self):
+        self.rerun_called = True
 
     def stop(self):
         raise StopCalled()
@@ -170,6 +177,7 @@ def test_render_login_form_success(monkeypatch):
     assert basic_auth.render_login_form(config) is True
     assert stub.session_state[basic_auth._SESSION_AUTH_FLAG] is True  # type: ignore[attr-defined]
     assert ("success", "認証に成功しました。") in stub.messages()
+    assert stub.rerun_called is True
 
 
 def test_render_login_form_failure(monkeypatch):
