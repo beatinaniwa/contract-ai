@@ -19,6 +19,34 @@ from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
 from services.desired_contract import summarize_desired_contract
 
+
+def _strip_desired_titles(text: str) -> str:
+    """Normalize desired_contract text for UI by shortening section titles."""
+    if not text:
+        return text
+    title_patterns = [
+        # 1. / 2. variations
+        re.compile(r"^(?:財活動上|知財活動上)の目論見[（(].*[）)]$"),
+        re.compile(r"^(?:当社の)?知財活動上の目論見[（(].*[）)]$"),
+        re.compile(r"^(?:(?:相手方|相手|先方)の)?知財活動上の目論見[（(].*[）)]$"),
+        # 2. canonical title
+        re.compile(r"^生じ得る知財[（(].*[）)]とその性質[（(].*[）)]$"),
+        # 3. / 4. titles
+        re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容[（(].*[）)]$"),
+        re.compile(r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"),
+    ]
+    out_lines: list[str] = []
+    for ln in text.splitlines():
+        m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
+        if m:
+            num = m.group(1)
+            rest = m.group(2).strip()
+            if any(pat.match(rest) for pat in title_patterns):
+                out_lines.append(f"{num}. ")
+                continue
+        out_lines.append(ln)
+    return "\n".join(out_lines)
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
 
@@ -41,18 +69,25 @@ st.session_state.setdefault("qa_task_pending", False)
 st.session_state.setdefault("qa_task", None)
 
 
+def _normalize_widget_value(key: str, value):
+    if key == "desired_contract_widget" and isinstance(value, str):
+        return _strip_desired_titles(value)
+    return value
+
+
 def _apply_if_not_modified(key: str, value):
     if value is None:
         return
+    normalized = _normalize_widget_value(key, value)
     if key not in st.session_state:
-        st.session_state[key] = value
-        ai_baseline[key] = value
+        st.session_state[key] = normalized
+        ai_baseline[key] = normalized
         return
     current = st.session_state.get(key)
     base = ai_baseline.get(key)
-    if current == base:
-        st.session_state[key] = value
-        ai_baseline[key] = value
+    if base is None or current == base:
+        st.session_state[key] = normalized
+        ai_baseline[key] = normalized
 
 
 if isinstance(pending_updates, dict):
@@ -474,7 +509,9 @@ with col_main:
     # 基本情報
     def _ensure_default(key: str, default):
         if key not in st.session_state:
-            st.session_state[key] = default
+            normalized = _normalize_widget_value(key, default)
+            st.session_state[key] = normalized
+            ai_baseline[key] = normalized
 
     _ensure_default("request_date_widget", form_data.get("request_date") or _dt_date.today())
     _ensure_default(
@@ -698,49 +735,18 @@ with col_main:
         """
     )
 
-    # 初期テンプレート（未入力時は番号のみ）
-    def _strip_desired_titles(text: str) -> str:
-        """UI表示用に、長い説明タイトルを番号だけに置換する。
-
-        例: "1. 財活動上の目論見（…）" -> "1. "
-        箇条書き ("- …") や番号行に直接書かれた本文 ("1. 本文") は残す。
-        生成側のバリエーションに対応するため、タイトル文はパターンで判定。
-        """
-        if not text:
-            return text
-        title_patterns = [
-            # バリエーション: 財/知財 活動上の目論見（当社/相手方/相手/先方）
-            re.compile(r"^(?:財活動上|知財活動上)の目論見[（(].*[）)]$"),
-            re.compile(r"^(?:当社の)?知財活動上の目論見[（(].*[）)]$"),
-            re.compile(r"^(?:(?:相手方|相手|先方)の)?知財活動上の目論見[（(].*[）)]$"),
-            # 2. の正式タイトル
-            re.compile(r"^生じ得る知財[（(].*[）)]とその性質[（(].*[）)]$"),
-            # 3. と 4. の見出し
-            re.compile(r"^上記2\.\s*に関する事業上の実施や許諾の内容[（(].*[）)]$"),
-            re.compile(
-                r"^上記1\.\s*および2\.\s*から生じ得る上記3\.\s*や知財上のリスク[（(].*[）)]$"
-            ),
-        ]
-        out_lines: list[str] = []
-        for ln in text.splitlines():
-            m = re.match(r"^\s*([1-4])\.\s*(.*)$", ln)
-            if m:
-                num = m.group(1)
-                rest = m.group(2).strip()
-                if any(pat.match(rest) for pat in title_patterns):
-                    out_lines.append(f"{num}. ")
-                    continue
-            out_lines.append(ln)
-        return "\n".join(out_lines)
-
     # 右カラムのAI反映で raw 文字列が入った場合でも、表示前にタイトルを簡略化
     try:
         if "desired_contract_widget" in st.session_state and isinstance(
             st.session_state.get("desired_contract_widget"), str
         ):
-            st.session_state["desired_contract_widget"] = _strip_desired_titles(
-                st.session_state.get("desired_contract_widget", "")
-            )
+            existing = st.session_state.get("desired_contract_widget", "")
+            normalized = _strip_desired_titles(existing)
+            if normalized != existing:
+                st.session_state["desired_contract_widget"] = normalized
+            base = ai_baseline.get("desired_contract_widget")
+            if base is None or base == existing:
+                ai_baseline["desired_contract_widget"] = normalized
     except Exception:
         pass
 
