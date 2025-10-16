@@ -39,7 +39,7 @@ PROMPT_TEMPLATE = """
 全てのキーを含む "form" オブジェクトを生成し、値が不明な場合は null を設定します。
 
 加えて、最後の項目「どんな契約にしたいか」を次の4観点で事実のみから構成してください（推測禁止）。
-不足がある場合は、ユーザが答えやすいフォローアップ質問を最大3つまで "follow_up_questions" に配列で出力してください。
+不足がある場合は、ユーザが答えやすいフォローアップ質問を最大5つまで "follow_up_questions" に配列で出力してください。
 
 必須のJSON構造:
 {{
@@ -73,7 +73,7 @@ PROMPT_TEMPLATE = """
     "case_number": 文字列または null,
     "desired_contract": 文字列または null
   }},
-  "follow_up_questions": 配列（0〜3件の日本語の短い質問）
+  "follow_up_questions": 配列（0〜5件の日本語の短い質問）
 }}
 
 制約:
@@ -116,18 +116,25 @@ UPDATE_PROMPT_TEMPLATE = """
 - 回答が曖昧/不十分な場合は既存の記述を維持してください。
 - desired_contract は4章構成・箇条書きを維持し、文言は回答やsource_textの原文に忠実にまとめてください。
 - 3欄すべて、存在しない事実や推測を追加しないでください。
+- 次ラウンドが必要か判定し、必要な場合のみ follow_up_questions を最大5件で出力してください。
 
 出力は次のJSONのみ:
-{
+{{
   "desired_contract": string,
   "our_overall_summary": string,
   "their_overall_summary": string,
-  "explanation": {
-    "desired_contract": {"action": "updated" | "unchanged", "reason": string},
-    "our_overall_summary": {"action": "updated" | "unchanged", "reason": string},
-    "their_overall_summary": {"action": "updated" | "unchanged", "reason": string}
-  }
-}
+  "explanation": {{
+    "desired_contract": {{"action": "updated" | "unchanged", "reason": string}},
+    "our_overall_summary": {{"action": "updated" | "unchanged", "reason": string}},
+    "their_overall_summary": {{"action": "updated" | "unchanged", "reason": string}}
+  }},
+  "follow_up_questions": [
+    {{
+      "question": string,
+      "target": "desired_contract" | "our_overall_summary" | "their_overall_summary"
+    }}
+  ]
+}}
 
 source_text:
 {source_text}
@@ -374,11 +381,36 @@ def _get_client():
     return genai.Client(api_key=api_key)
 
 
+def gemini_healthcheck() -> tuple[bool, str]:
+    """Perform a minimal request to verify Gemini connectivity and model availability.
+
+    Returns (ok, message). The message is safe to show in UI logs.
+    """
+    try:
+        client = _get_client()
+        # Send a tiny prompt to the configured model
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_NAME,
+            contents="ping",
+        )
+        feedback = getattr(response, "prompt_feedback", None)
+        if feedback and getattr(feedback, "block_reason", None):
+            return False, f"Blocked by safety: {feedback.block_reason}"
+        content = getattr(response, "text", None)
+        if not content:
+            return False, "Empty response"
+        return True, "OK"
+    except GeminiConfigError as exc:
+        return False, f"Config error: {exc}"
+    except Exception as exc:  # pragma: no cover - external API variations
+        return False, f"API error: {exc.__class__.__name__}: {exc}"
+
+
 def update_contract_sections_with_gemini(
     source_text: str,
     current_values: Dict[str, str],
     qa: Sequence[Dict[str, str]],
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """Use Gemini to determine whether and how to update the three target fields.
 
     Returns a dict with the three keys. Raises on configuration/API errors.
@@ -425,12 +457,16 @@ def update_contract_sections_with_gemini(
             "reason": "回答を反映して追記/修正" if their != before_their else "回答により変更不要",
         }
 
-    out: Dict[str, str] = {
+    out: Dict[str, Any] = {
         "desired_contract": dc,
         "our_overall_summary": our,
         "their_overall_summary": their,
     }
     # Attach explanation for UI consumption
-    out_with_expl: Dict[str, str] = dict(out)
+    out_with_expl: Dict[str, Any] = dict(out)
     out_with_expl["explanation"] = explanation  # type: ignore[assignment]
+    # Optional next-round questions (0-5). Accept either list[str] or list[dict]
+    fu = parsed.get("follow_up_questions")
+    if isinstance(fu, list):
+        out_with_expl["follow_up_questions"] = fu[:5]  # type: ignore[index]
     return out_with_expl

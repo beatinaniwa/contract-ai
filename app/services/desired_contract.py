@@ -37,22 +37,68 @@ def summarize_desired_contract(text: str) -> Tuple[str, List[str]]:
     Never infer; only include sentences that appear in the source text.
     If a viewpoint has no extractable facts, mark as '記載なし'.
     Returns a tuple of (summary_text, follow_up_questions).
-    The follow-up questions are at most 3 and phrased for easy user answers.
+    The follow-up questions are at most 5 and phrased for easy user answers.
     """
     sentences = _split_sentences_jp(text)
 
     # Viewpoint keywords
     vp1_or_2_keywords = [
-        "知財", "特許", "出願", "権利化", "権利帰属", "ライセンス", "実施許諾", "譲渡", "売買", "保証", "表明",
-        "補償", "ノウハウ", "著作権", "商標", "秘密", "NDA", "機密保持",
+        "知財",
+        "特許",
+        "出願",
+        "権利化",
+        "権利帰属",
+        "ライセンス",
+        "実施許諾",
+        "譲渡",
+        "売買",
+        "保証",
+        "表明",
+        "補償",
+        "ノウハウ",
+        "著作権",
+        "商標",
+        "秘密",
+        "NDA",
+        "機密保持",
     ]
     vp3_keywords = [
-        "実施", "許諾", "サブライセンス", "対象", "範囲", "地域", "期間", "用途", "製品", "当社製品",
-        "相手の製品", "顧客", "双方", "第三者", "量産", "販売", "提供",
+        "実施",
+        "許諾",
+        "サブライセンス",
+        "対象",
+        "範囲",
+        "地域",
+        "期間",
+        "用途",
+        "製品",
+        "当社製品",
+        "相手の製品",
+        "顧客",
+        "双方",
+        "第三者",
+        "量産",
+        "販売",
+        "提供",
     ]
     vp4_keywords = [
-        "リスク", "支障", "障害", "第三者", "権利行使", "侵害", "紛争", "コンタミ", "混入", "実施料",
-        "ロイヤリティ", "費用", "損害", "補償", "無効", "抵触", "FTO",
+        "リスク",
+        "支障",
+        "障害",
+        "第三者",
+        "権利行使",
+        "侵害",
+        "紛争",
+        "コンタミ",
+        "混入",
+        "実施料",
+        "ロイヤリティ",
+        "費用",
+        "損害",
+        "補償",
+        "無効",
+        "抵触",
+        "FTO",
     ]
 
     vp1 = _collect_matches(sentences, vp1_or_2_keywords)
@@ -88,25 +134,25 @@ def summarize_desired_contract(text: str) -> Tuple[str, List[str]]:
 
     summary = "\n\n".join(sections)
 
-    # Build up to 3 questions for missing areas
+    # Build up to 5 questions for missing areas
     questions: List[str] = []
-    if not vp1 and len(questions) < 3:
+    if not vp1 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）知財の取り扱い方針（創出/権利化/ライセンス/売買/保証）のうち、今回の目標は何ですか？"
         )
-    if not vp2 and len(questions) < 3:
+    if not vp2 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）知財面で追加で重視したい事項（例: ノウハウ帰属、譲渡可否、保証範囲）がありますか？"
         )
-    if not vp3 and len(questions) < 3:
+    if not vp3 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）実施・許諾の対象と範囲（当社製品/相手製品/双方、地域・期間、サブライセンス可否）を教えてください。"
         )
-    if not vp4 and len(questions) < 3:
+    if not vp4 and len(questions) < 5:
         questions.append(
             "（どんな契約にしたいか補足）想定リスク（自己実施の支障、第三者権利、コンタミ、実施料 等）があれば列挙してください。"
         )
 
-    # Ensure at most 3
-    questions = questions[:3]
+    # Ensure at most 5
+    questions = questions[:5]
     return summary, questions
