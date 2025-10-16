@@ -20,6 +20,26 @@ from services.validator import validate_form
 from services.desired_contract import summarize_desired_contract
 
 
+CounterpartyTypeChoice = Literal[
+    "民間", "大学", "先生（個人）", "国等・独立行政法人等", "その他"
+]
+SolutionPlanningConsultationChoice = Literal["未", "済"]
+ContractFormChoice = Literal["当社書式", "相手書式"]
+
+COUNTERPARTY_TYPE_CHOICES: tuple[CounterpartyTypeChoice, ...] = (
+    "民間",
+    "大学",
+    "先生（個人）",
+    "国等・独立行政法人等",
+    "その他",
+)
+SOLUTION_PLANNING_CONSULTATION_CHOICES: tuple[SolutionPlanningConsultationChoice, ...] = (
+    "未",
+    "済",
+)
+CONTRACT_FORM_CHOICES: tuple[ContractFormChoice, ContractFormChoice] = ("当社書式", "相手書式")
+
+
 def _strip_desired_titles(text: str) -> str:
     """Normalize desired_contract text for UI by shortening section titles."""
     if not text:
@@ -70,13 +90,13 @@ st.session_state.setdefault("qa_task", None)
 st.session_state.setdefault("qa_round_tag", 0)
 
 
-def _normalize_widget_value(key: str, value):
+def _normalize_widget_value(key: str, value: object) -> object:
     if key == "desired_contract_widget" and isinstance(value, str):
         return _strip_desired_titles(value)
     return value
 
 
-def _apply_if_not_modified(key: str, value):
+def _apply_if_not_modified(key: str, value: object | None) -> None:
     if value is None:
         return
     normalized = _normalize_widget_value(key, value)
@@ -89,6 +109,13 @@ def _apply_if_not_modified(key: str, value):
     if base is None or current == base:
         st.session_state[key] = normalized
         ai_baseline[key] = normalized
+
+
+def _clear_session_state_prefix(prefix: str) -> None:
+    """Remove session_state entries whose keys start with prefix."""
+    for session_key in list(st.session_state.keys()):
+        if isinstance(session_key, str) and session_key.startswith(prefix):
+            st.session_state.pop(session_key, None)
 
 
 if isinstance(pending_updates, dict):
@@ -105,7 +132,7 @@ ui_disabled = bool(st.session_state.get("ui_locked", False))
 
 
 # ---- Q&A処理（背景実行用）: 送信後の次ラン先頭で実行し、完了したら再描画 ----
-def _process_qa_task():
+def _process_qa_task() -> None:
     task = st.session_state.get("qa_task") or {}
     answered_for_model = task.get("answered_qas_model") or task.get("answered_qas", [])
     answered_meta = task.get("answered_qas_meta") or task.get("answered_qas", [])
@@ -347,16 +374,12 @@ def _process_qa_task():
         st.session_state["extracted"]["follow_up_questions"] = next_questions
         st.session_state["qa_round"] = round_no + 1
         st.session_state["qa_round_tag"] = st.session_state.get("qa_round_tag", 0) + 1
-        for key in list(st.session_state.keys()):
-            if key.startswith("qa_answer_"):
-                st.session_state.pop(key, None)
+        _clear_session_state_prefix("qa_answer_")
     else:
         st.session_state["extracted"].pop("follow_up_questions", None)
         st.session_state["qa_round"] = 0
         st.session_state["qa_round_tag"] = 0
-        for key in list(st.session_state.keys()):
-            if key.startswith("qa_answer_"):
-                st.session_state.pop(key, None)
+        _clear_session_state_prefix("qa_answer_")
 
     engine_label = (
         "Gemini 2.5 Pro"
@@ -441,9 +464,7 @@ with col_right:
         st.session_state["source_text"] = src_text
         st.session_state["qa_round"] = 0
         st.session_state["qa_round_tag"] = 0
-        for key in list(st.session_state.keys()):
-            if key.startswith("qa_answer_"):
-                st.session_state.pop(key, None)
+        _clear_session_state_prefix("qa_answer_")
 
         # 3欄のウィジェットキーへも反映（次の rerun の先頭で適用）
         form_preview = result.get("form", {}) if isinstance(result, dict) else {}
@@ -519,10 +540,17 @@ if qa_feedback:
         st.info(qa_message)
 
 
-def load_vocab():
+def load_vocab() -> Dict[str, List[str]]:
     p = os.path.join(BASE_DIR, "policies", "vocab.yaml")
     with open(p, "r", encoding="utf-8") as f_yaml:
-        return yaml.safe_load(f_yaml)
+        loaded = yaml.safe_load(f_yaml)
+
+    vocab_data: Dict[str, List[str]] = {}
+    if isinstance(loaded, dict):
+        for key, value in loaded.items():
+            if isinstance(key, str) and isinstance(value, list):
+                vocab_data[key] = [str(item) for item in value]
+    return vocab_data
 
 
 vocab = load_vocab()
@@ -542,7 +570,7 @@ with col_main:
     # 動的フォーム
     # 入力ウィジェット（フォームを使わずリアクティブに）
     # 基本情報
-    def _ensure_default(key: str, default):
+    def _ensure_default(key: str, default: object) -> None:
         if key not in st.session_state:
             normalized = _normalize_widget_value(key, default)
             st.session_state[key] = normalized
@@ -629,7 +657,7 @@ with col_main:
     _ensure_default("counterparty_profile_widget", form_data.get("counterparty_profile", ""))
     counterparty_profile = st.text_area("契約相手_プロフィール", height=80, key="counterparty_profile_widget", disabled=ui_disabled)
     # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
-    counterparty_type_options = vocab.get("counterparty_type", [])
+    counterparty_type_options = vocab.get("counterparty_type", list(COUNTERPARTY_TYPE_CHOICES))
     default_counterparty_type = form_data.get("counterparty_type")
     ct_index = (
         (
@@ -652,7 +680,9 @@ with col_main:
         "国等・独立行政法人等",
     }
     if requires_solution_consult:
-        spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
+        spo_options = vocab.get(
+            "solution_planning_office_consultation", list(SOLUTION_PLANNING_CONSULTATION_CHOICES)
+        )  # fallback
         default_spo = form_data.get("solution_planning_office_consultation")
         spo_index = (
             (spo_options.index(default_spo) if default_spo in spo_options else 0)
@@ -668,7 +698,7 @@ with col_main:
     else:
         solution_planning_office_consultation = ""
 
-    contract_form_options = vocab.get("contract_form", ["当社書式", "相手書式"])
+    contract_form_options = vocab.get("contract_form", list(CONTRACT_FORM_CHOICES))
     default_contract_form = form_data.get("contract_form")
     cf_index = (
         (
@@ -812,6 +842,21 @@ with col_main:
         related_flag: Literal["該当なし", "該当あり"] = cast(
             Literal["該当なし", "該当あり"], raw_related_flag
         )
+        counterparty_type_literal = (
+            cast(CounterpartyTypeChoice, counterparty_type)
+            if counterparty_type in COUNTERPARTY_TYPE_CHOICES
+            else None
+        )
+        solution_planning_literal = (
+            cast(SolutionPlanningConsultationChoice, solution_planning_office_consultation)
+            if solution_planning_office_consultation in SOLUTION_PLANNING_CONSULTATION_CHOICES
+            else None
+        )
+        contract_form_literal = (
+            cast(ContractFormChoice, contract_form)
+            if contract_form in CONTRACT_FORM_CHOICES
+            else None
+        )
         cf = ContractForm(
             request_date=request_date or None,
             normal_due_date=normal_due_date or None,
@@ -827,9 +872,9 @@ with col_main:
             counterparty_name=counterparty_name or None,
             counterparty_address=counterparty_address or None,
             counterparty_profile=counterparty_profile or None,
-            counterparty_type=counterparty_type or None,
-            solution_planning_office_consultation=(solution_planning_office_consultation or None),
-            contract_form=contract_form or None,
+            counterparty_type=counterparty_type_literal,
+            solution_planning_office_consultation=solution_planning_literal,
+            contract_form=contract_form_literal,
             related_contract_flag=related_flag,
             amount_jpy=amount_jpy or None,
             info_from_us=info_from_us,
@@ -1025,7 +1070,7 @@ with col_main:
         else:
             st.caption("Geminiは実行していません（回答未入力のため）")
 
-        def _render_line(label: str, key: str):
+        def _render_line(label: str, key: str) -> None:
             info = expl.get(key, {}) if isinstance(expl, dict) else {}
             action = info.get("action", "unknown")
             reason = info.get("reason", "")
