@@ -67,6 +67,7 @@ st.session_state.setdefault("ui_locked", False)
 st.session_state.setdefault("ui_busy_message", "")
 st.session_state.setdefault("qa_task_pending", False)
 st.session_state.setdefault("qa_task", None)
+st.session_state.setdefault("qa_round_tag", 0)
 
 
 def _normalize_widget_value(key: str, value):
@@ -345,9 +346,17 @@ def _process_qa_task():
     if next_questions and round_no < 1:
         st.session_state["extracted"]["follow_up_questions"] = next_questions
         st.session_state["qa_round"] = round_no + 1
+        st.session_state["qa_round_tag"] = st.session_state.get("qa_round_tag", 0) + 1
+        for key in list(st.session_state.keys()):
+            if key.startswith("qa_answer_"):
+                st.session_state.pop(key, None)
     else:
         st.session_state["extracted"].pop("follow_up_questions", None)
         st.session_state["qa_round"] = 0
+        st.session_state["qa_round_tag"] = 0
+        for key in list(st.session_state.keys()):
+            if key.startswith("qa_answer_"):
+                st.session_state.pop(key, None)
 
     engine_label = (
         "Gemini 2.5 Pro"
@@ -431,6 +440,10 @@ with col_right:
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
         st.session_state["qa_round"] = 0
+        st.session_state["qa_round_tag"] = 0
+        for key in list(st.session_state.keys()):
+            if key.startswith("qa_answer_"):
+                st.session_state.pop(key, None)
 
         # 3欄のウィジェットキーへも反映（次の rerun の先頭で適用）
         form_preview = result.get("form", {}) if isinstance(result, dict) else {}
@@ -890,10 +903,11 @@ with col_main:
         else:
             st.caption("第2ラウンドの確認質問です。未充足の点のみ再確認します。")
         answers: Dict[int, str] = {}
+        round_tag = int(st.session_state.get("qa_round_tag", 0))
         for idx, q in enumerate(follow_up):
             q_text = q.get("question", "") if isinstance(q, dict) else str(q)
             st.markdown(f"Q{idx + 1}. {q_text}")
-            ans_key = f"qa_answer_{idx}"
+            ans_key = f"qa_answer_{round_tag}_{idx}"
             answers[idx] = st.text_area(
                 label=f"回答{idx + 1}",
                 key=ans_key,
