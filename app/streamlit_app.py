@@ -65,36 +65,7 @@ if isinstance(pending_updates, dict):
 # フォーム操作の有効/無効フラグ
 ui_disabled = bool(st.session_state.get("ui_locked", False))
 
-# 反映中オーバーレイ（全体グレーアウト + メッセージ）
-if ui_disabled:
-    overlay_html = f"""
-    <style>
-    .lock-overlay {{
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.25);
-        backdrop-filter: blur(1px);
-        z-index: 9999;
-    }}
-    .lock-overlay .message {{
-        position: absolute;
-        top: 12%;
-        left: 50%;
-        transform: translate(-50%, 0);
-        background: #ffffff;
-        color: #333;
-        padding: 12px 16px;
-        border-radius: 8px;
-        box-shadow: 0 2px 12px rgba(0,0,0,0.15);
-        font-size: 14px;
-        border: 1px solid #e6e6e6;
-    }}
-    </style>
-    <div class="lock-overlay">
-      <div class="message">⏳ {st.session_state.get('ui_busy_message') or 'AIの回答結果を反映しています…'}</div>
-    </div>
-    """
-    st.markdown(overlay_html, unsafe_allow_html=True)
+## グレーアウトのオーバーレイは無効化（要望により一旦撤回）
 
 
 # ---- Q&A処理（背景実行用）: 送信後の次ラン先頭で実行し、完了したら再描画 ----
