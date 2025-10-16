@@ -34,6 +34,8 @@ st.session_state.setdefault("uploaded_file_digest", None)
 # - AIが最後に適用した値（ベースライン）と現値が一致する場合のみ更新
 pending_updates = st.session_state.pop("pending_widget_updates", None)
 ai_baseline = st.session_state.setdefault("ai_baseline", {})
+
+
 def _apply_if_not_modified(key: str, value):
     if value is None:
         return
@@ -46,6 +48,7 @@ def _apply_if_not_modified(key: str, value):
     if current == base:
         st.session_state[key] = value
         ai_baseline[key] = value
+
 
 if isinstance(pending_updates, dict):
     for k, v in pending_updates.items():
@@ -103,7 +106,7 @@ with col_right:
 
         # 3欄のウィジェットキーへも反映（次の rerun の先頭で適用）
         form_preview = result.get("form", {}) if isinstance(result, dict) else {}
-        updates = {}
+        updates: Dict[str, object] = {}
         # 3欄
         dc_val = form_preview.get("desired_contract")
         our_val = form_preview.get("our_overall_summary")
@@ -150,7 +153,7 @@ with col_right:
         try:
             getattr(st, "rerun")()
         except Exception:
-            st.experimental_rerun()
+            getattr(st, "experimental_rerun", lambda: None)()
 
 
 feedback = st.session_state.pop("extract_feedback", None)
@@ -206,10 +209,14 @@ with col_main:
         key="normal_due_date_widget",
     )
     requester_department = st.text_input(
-        "依頼者_所属", value=form_data.get("requester_department", ""), key="requester_department_widget"
+        "依頼者_所属",
+        value=form_data.get("requester_department", ""),
+        key="requester_department_widget",
     )
     requester_manager = st.text_input(
-        "依頼者_責任者", value=form_data.get("requester_manager", ""), key="requester_manager_widget"
+        "依頼者_責任者",
+        value=form_data.get("requester_manager", ""),
+        key="requester_manager_widget",
     )
     requester_staff = st.text_input(
         "依頼者_担当者", value=form_data.get("requester_staff", ""), key="requester_staff_widget"
@@ -253,7 +260,10 @@ with col_main:
         "案件_案件名", value=form_data.get("project_name", ""), key="project_name_widget"
     )
     activity_purpose = st.text_area(
-        "案件_活動目的", value=form_data.get("activity_purpose", ""), height=80, key="activity_purpose_widget"
+        "案件_活動目的",
+        value=form_data.get("activity_purpose", ""),
+        height=80,
+        key="activity_purpose_widget",
     )
     activity_start = st.text_input(
         "案件_実活動時期", value=form_data.get("activity_start", ""), key="activity_start_widget"
@@ -263,9 +273,7 @@ with col_main:
     project_target_item_options = vocab.get(
         "project_target_item", ["ハード", "ソフト", "技術", "役務", "その他"]
     )
-    default_target_raw = form_data.get("project_target_item") or form_data.get(
-        "target_item_name"
-    )
+    default_target_raw = form_data.get("project_target_item") or form_data.get("target_item_name")
     if default_target_raw in project_target_item_options:
         project_target_item_index = project_target_item_options.index(default_target_raw)
     elif default_target_raw and "その他" in project_target_item_options:
@@ -279,13 +287,20 @@ with col_main:
     )
 
     counterparty_name = st.text_input(
-        "契約相手_名称", value=form_data.get("counterparty_name", ""), key="counterparty_name_widget"
+        "契約相手_名称",
+        value=form_data.get("counterparty_name", ""),
+        key="counterparty_name_widget",
     )
     counterparty_address = st.text_input(
-        "契約相手_所在地", value=form_data.get("counterparty_address", ""), key="counterparty_address_widget"
+        "契約相手_所在地",
+        value=form_data.get("counterparty_address", ""),
+        key="counterparty_address_widget",
     )
     counterparty_profile = st.text_area(
-        "契約相手_プロフィール", value=form_data.get("counterparty_profile", ""), height=80, key="counterparty_profile_widget"
+        "契約相手_プロフィール",
+        value=form_data.get("counterparty_profile", ""),
+        height=80,
+        key="counterparty_profile_widget",
     )
     # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
     counterparty_type_options = vocab.get("counterparty_type", [])
@@ -304,7 +319,11 @@ with col_main:
         options=counterparty_type_options or ["民間"],
         index=ct_index,
     )
-    requires_solution_consult = counterparty_type in {"大学", "先生（個人）", "国等・独立行政法人等"}
+    requires_solution_consult = counterparty_type in {
+        "大学",
+        "先生（個人）",
+        "国等・独立行政法人等",
+    }
     if requires_solution_consult:
         spo_options = vocab.get("solution_planning_office_consultation", ["未", "済"])  # fallback
         default_spo = form_data.get("solution_planning_office_consultation")
@@ -332,9 +351,7 @@ with col_main:
         if contract_form_options
         else 0
     )
-    contract_form = st.selectbox(
-        "概要_契約書式", options=contract_form_options, index=cf_index
-    )
+    contract_form = st.selectbox("概要_契約書式", options=contract_form_options, index=cf_index)
     related_contract_flag = st.selectbox(
         "概要_関連契約",
         options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
@@ -342,7 +359,11 @@ with col_main:
     )
 
     amount_jpy = st.number_input(
-        "概要_金額", min_value=0, step=1000, value=int(form_data.get("amount_jpy", 0)), key="amount_jpy_widget"
+        "概要_金額",
+        min_value=0,
+        step=1000,
+        value=int(form_data.get("amount_jpy", 0)),
+        key="amount_jpy_widget",
     )
 
     # 開示される情報
@@ -538,6 +559,7 @@ with col_main:
         )
         ok, missing = validate_form(cf)
         if not ok:
+
             def _to_japanese_labels(keys: list[str]) -> list[str]:
                 try:
                     with open(MAPPING, "r", encoding="utf-8") as f_yaml:
@@ -582,7 +604,8 @@ with col_main:
             st.caption("第2ラウンドの確認質問です。未充足の点のみ再確認します。")
         answers: Dict[int, str] = {}
         for idx, q in enumerate(follow_up):
-            st.markdown(f"Q{idx + 1}. {q}")
+            q_text = q.get("question", "") if isinstance(q, dict) else str(q)
+            st.markdown(f"Q{idx + 1}. {q_text}")
             ans_key = f"qa_answer_{idx}"
             answers[idx] = st.text_area(
                 label=f"回答{idx + 1}",
@@ -650,11 +673,12 @@ with col_main:
             remaining_questions: List[str] = []
             answered_qas: List[Dict[str, str]] = []
             for idx, q in enumerate(follow_up):
+                q_text = q.get("question", "") if isinstance(q, dict) else str(q)
                 ans = (answers.get(idx) or "").strip()
                 if not ans:
-                    remaining_questions.append(q)
+                    remaining_questions.append(q_text)
                     continue
-                answered_qas.append({"question": q, "answer": ans})
+                answered_qas.append({"question": q_text, "answer": ans})
 
             updated_dc = base_dc
             explanation_for_ui: Dict[str, Dict[str, str]] | None = None
@@ -680,6 +704,16 @@ with col_main:
                     maybe_expl = updated.get("explanation")
                     if isinstance(maybe_expl, dict):
                         explanation_for_ui = maybe_expl  # type: ignore[assignment]
+                    # Prefer model-provided follow-ups if any (normalize to text)
+                    model_fus_raw = updated.get("follow_up_questions")
+                    model_follow_ups: List[str] = []
+                    if isinstance(model_fus_raw, list):
+                        for item in model_fus_raw:
+                            qtxt = item.get("question", "") if isinstance(item, dict) else str(item)
+                            if qtxt and qtxt.strip():
+                                model_follow_ups.append(qtxt.strip())
+                        # Cap at 5 just in case
+                        model_follow_ups = model_follow_ups[:5]
             except Exception as exc:
                 gemini_error = f"Gemini の呼び出しに失敗: {exc.__class__.__name__}: {exc}"
                 sections = _parse_sections(base_dc)
@@ -776,15 +810,24 @@ with col_main:
                     )
                 # 追加の要約欄（空のときのみ簡潔に質問）
                 if not (our_summary or "").strip():
-                    q_list.append("（概要補足）当社の契約活動概要や成果事業化の要点を一言で教えてください。")
+                    q_list.append(
+                        "（概要補足）当社の契約活動概要や成果事業化の要点を一言で教えてください。"
+                    )
                 if not (their_summary or "").strip():
-                    q_list.append("（概要補足）相手の契約活動概要や成果事業化の要点を一言で教えてください。")
+                    q_list.append(
+                        "（概要補足）相手の契約活動概要や成果事業化の要点を一言で教えてください。"
+                    )
                 return q_list
 
             # 次ラウンドの質問生成（最大5件）
             round_no = int(st.session_state.get("qa_round", 0))
             sections_ok = _sections_status(updated_dc)
-            next_candidates = remaining_questions + _build_questions_for_missing(sections_ok)
+            # If the model returned follow-ups, prefer them; always carry through remaining
+            candidate_from_model = locals().get("model_follow_ups", []) or []
+            if candidate_from_model:
+                next_candidates = remaining_questions + candidate_from_model
+            else:
+                next_candidates = remaining_questions + _build_questions_for_missing(sections_ok)
             # 重複除去を順序維持で
             seen = set()
             next_questions: List[str] = []
@@ -805,20 +848,35 @@ with col_main:
 
             # 反映の要約（Gemini / フォールバック / スキップ）
             engine_label = (
-                "Gemini 2.5 Pro" if engine_status == "gemini"
-                else "Gemini未使用のフォールバック" if engine_status == "fallback"
+                "Gemini 2.5 Pro"
+                if engine_status == "gemini"
+                else "Gemini未使用のフォールバック"
+                if engine_status == "fallback"
                 else "Gemini未実行（回答未入力）"
             )
+
             def _stat_line(lbl: str, key: str) -> str:
-                info = (explanation_for_ui or {}).get(key, {}) if isinstance(explanation_for_ui, dict) else {}
+                info = (
+                    (explanation_for_ui or {}).get(key, {})
+                    if isinstance(explanation_for_ui, dict)
+                    else {}
+                )
                 action = info.get("action")
                 if not action:
                     # 簡易推定
-                    before = base_dc if key == "desired_contract" else (
-                        form_data.get("our_overall_summary", "") if key == "our_overall_summary" else form_data.get("their_overall_summary", "")
+                    before = (
+                        base_dc
+                        if key == "desired_contract"
+                        else (
+                            form_data.get("our_overall_summary", "")
+                            if key == "our_overall_summary"
+                            else form_data.get("their_overall_summary", "")
+                        )
                     )
-                    after = updated_dc if key == "desired_contract" else (
-                        our_summary if key == "our_overall_summary" else their_summary
+                    after = (
+                        updated_dc
+                        if key == "desired_contract"
+                        else (our_summary if key == "our_overall_summary" else their_summary)
                     )
                     action = "updated" if (before or "") != (after or "") else "unchanged"
                 jp = "更新" if action == "updated" else "変更なし"
@@ -832,7 +890,9 @@ with col_main:
             addendum = f"\n（注意）{gemini_error}" if gemini_error else ""
             st.session_state["qa_feedback"] = (
                 "success",
-                f"{engine_label}で回答を吟味し、フォームへ反映しました。\n- " + "\n- ".join(summary_lines) + addendum,
+                f"{engine_label}で回答を吟味し、フォームへ反映しました。\n- "
+                + "\n- ".join(summary_lines)
+                + addendum,
             )
 
             if not next_questions:
@@ -846,7 +906,7 @@ with col_main:
             try:
                 getattr(st, "rerun")()
             except Exception:
-                st.experimental_rerun()
+                getattr(st, "experimental_rerun", lambda: None)()
 
     expl = st.session_state.get("qa_update_explanation")
     if expl:
