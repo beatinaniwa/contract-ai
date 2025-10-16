@@ -106,7 +106,8 @@ ui_disabled = bool(st.session_state.get("ui_locked", False))
 # ---- Q&A処理（背景実行用）: 送信後の次ラン先頭で実行し、完了したら再描画 ----
 def _process_qa_task():
     task = st.session_state.get("qa_task") or {}
-    answered_qas = task.get("answered_qas", [])
+    answered_for_model = task.get("answered_qas_model") or task.get("answered_qas", [])
+    answered_meta = task.get("answered_qas_meta") or task.get("answered_qas", [])
     remaining_questions = task.get("remaining_questions", [])
     source_text = task.get("source_text", "")
     base_dc = task.get("base_dc", "") or summarize_desired_contract(source_text)[0]
@@ -123,7 +124,7 @@ def _process_qa_task():
     model_follow_ups: List[str] = []
 
     try:
-        if answered_qas:
+        if answered_for_model:
             updated = update_contract_sections_with_gemini(
                 source_text=source_text,
                 current_values={
@@ -131,7 +132,7 @@ def _process_qa_task():
                     "our_overall_summary": our_summary or "",
                     "their_overall_summary": their_summary or "",
                 },
-                qa=answered_qas,
+                qa=answered_for_model,
             )
             engine_status = "gemini"
             updated_dc = updated.get("desired_contract", base_dc) or base_dc
@@ -196,20 +197,30 @@ def _process_qa_task():
             return "\n\n".join(chunks)
 
         sections = _parse_sections(base_dc)
-        for qa in answered_qas:
-            q = qa["question"]
-            ans = qa["answer"]
-            sec = _map_question_to_section(q)
-            if sec:
-                sections.setdefault(sec, [])
-                if ans not in sections[sec]:
-                    sections[sec].append(ans)
-            if any(key in ans for key in ("当社", "弊社")):
+        for qa in answered_meta:
+            q = qa.get("question", "")
+            ans = qa.get("answer", "")
+            target = qa.get("target")
+            sec = None
+            if target == "desired_contract" or target is None:
+                sec = _map_question_to_section(q)
+                if sec:
+                    sections.setdefault(sec, [])
+                    if ans not in sections[sec]:
+                        sections[sec].append(ans)
+            if target == "our_overall_summary":
                 our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
-            if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
+            elif target == "their_overall_summary":
                 their_summary = (
                     their_summary + ("\n" if their_summary else "") + ans
                 ).strip()
+            else:
+                if any(key in ans for key in ("当社", "弊社")):
+                    our_summary = (our_summary + ("\n" if our_summary else "") + ans).strip()
+                if any(key in ans for key in ("相手", "先方", "相手方", "相手先")):
+                    their_summary = (
+                        their_summary + ("\n" if their_summary else "") + ans
+                    ).strip()
         updated_dc = _rebuild_desired_contract(sections)
         explanation_for_ui = {
             "desired_contract": {
@@ -312,11 +323,22 @@ def _process_qa_task():
     else:
         next_candidates = remaining_questions + _build_questions_for_missing(sections_ok)
     seen: set[str] = set()
-    next_questions: List[str] = []
-    for q in next_candidates:
-        if q and q.strip() and q not in seen:
-            seen.add(q)
-            next_questions.append(q)
+    next_questions: List[Dict[str, str]] = []
+    for item in next_candidates:
+        if isinstance(item, dict):
+            qtext = item.get("question", "")
+            qtarget = item.get("target")
+        else:
+            qtext = str(item)
+            qtarget = None
+        normalized_text = qtext.strip()
+        if not normalized_text or normalized_text in seen:
+            continue
+        seen.add(normalized_text)
+        entry: Dict[str, str] = {"question": normalized_text}
+        if qtarget:
+            entry["target"] = qtarget
+        next_questions.append(entry)
         if len(next_questions) >= 5:
             break
 
@@ -936,21 +958,34 @@ with col_main:
             our_summary = form_data.get("our_overall_summary", "") or ""
             their_summary = form_data.get("their_overall_summary", "") or ""
 
-            remaining_questions: List[str] = []
-            answered_qas: List[Dict[str, str]] = []
+            remaining_questions: List[Dict[str, str]] = []
+            answered_qas_model: List[Dict[str, str]] = []
+            answered_qas_meta: List[Dict[str, str]] = []
             for idx, q in enumerate(follow_up):
-                q_text = q.get("question", "") if isinstance(q, dict) else str(q)
+                if isinstance(q, dict):
+                    q_text = q.get("question", "")
+                    q_target = q.get("target")
+                    q_obj = {k: v for k, v in q.items() if v is not None}
+                else:
+                    q_text = str(q)
+                    q_target = None
+                    q_obj = {"question": q_text}
                 ans = (answers.get(idx) or "").strip()
                 if not ans:
-                    remaining_questions.append(q_text)
+                    remaining_questions.append(q_obj)
                     continue
-                answered_qas.append({"question": q_text, "answer": ans})
+                answered_qas_model.append({"question": q_text, "answer": ans})
+                meta = {"question": q_text, "answer": ans}
+                if q_target:
+                    meta["target"] = q_target
+                answered_qas_meta.append(meta)
 
             # ロックして処理を次ラン先頭に委譲
             st.session_state["ui_locked"] = True
             st.session_state["ui_busy_message"] = "AIの回答結果を反映しています…"
             st.session_state["qa_task"] = {
-                "answered_qas": answered_qas,
+                "answered_qas_model": answered_qas_model,
+                "answered_qas_meta": answered_qas_meta,
                 "remaining_questions": remaining_questions,
                 "source_text": source_text,
                 "base_dc": base_dc,
