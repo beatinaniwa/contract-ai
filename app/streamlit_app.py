@@ -11,6 +11,11 @@ from typing import List, Dict
 
 from models.schemas import ContractForm
 from services.audit import save_audit_log
+from services.basic_auth import (
+    credentials_match,
+    get_basic_auth_config,
+    get_request_credentials,
+)
 from services.csv_writer import write_csv
 from services.extractor import extract_contract_form
 from services.extractor import update_contract_sections_with_gemini
@@ -71,6 +76,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
 
 st.set_page_config(page_title="契約書作成アシスタント", layout="wide")
+
+basic_auth_config = get_basic_auth_config()
+if basic_auth_config:
+    provided_credentials = get_request_credentials()
+    if not credentials_match(provided_credentials, basic_auth_config):
+        st.error("Basic 認証に失敗しました。")
+        st.markdown(
+            "ブラウザのBasic認証ダイアログに正しいIDとパスワードを入力して再読み込みしてください。"
+        )
+        st.stop()
+
 st.title("契約書作成アシスタント")
 
 if "source_text_widget" not in st.session_state:
