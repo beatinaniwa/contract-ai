@@ -9,6 +9,11 @@ from typing import Mapping
 
 from config_loader import load_secret
 
+try:  # pragma: no cover - streamlit may not be importable in some contexts
+    import streamlit as st
+except Exception:  # pragma: no cover - keep optional dependency soft
+    st = None
+
 try:
     from streamlit.web.server.websocket_headers import _get_websocket_headers
 except Exception:  # pragma: no cover - streamlit fallback when not running in app context
@@ -78,12 +83,28 @@ def parse_basic_authorization_header(
     return username, password
 
 
+def _get_headers() -> Mapping[str, str] | None:
+    """Fetch headers from the running Streamlit context."""
+    if st is not None:
+        try:
+            headers = getattr(st.context, "headers", None)
+            if headers:  # Streamlit 1.28+
+                return headers
+        except Exception:  # pragma: no cover - context access may fail in tests
+            pass
+
+    if _get_websocket_headers is not None:
+        try:
+            return _get_websocket_headers()
+        except Exception:  # pragma: no cover - legacy fallback
+            return None
+
+    return None
+
+
 def get_request_credentials() -> tuple[str, str] | None:
     """Fetch credentials supplied via the websocket handshake headers."""
-    if _get_websocket_headers is None:
-        return None
-
-    headers: Mapping[str, str] | None = _get_websocket_headers()
+    headers = _get_headers()
     if not headers:
         return None
 

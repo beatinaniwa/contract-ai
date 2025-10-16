@@ -78,3 +78,15 @@ def test_credentials_match(monkeypatch):
     invalid_header = "Basic " + base64.b64encode(b"carol:wrong").decode("ascii")
     wrong_creds = basic_auth.parse_basic_authorization_header(invalid_header)
     assert basic_auth.credentials_match(wrong_creds, config) is False
+
+
+def test_get_request_credentials_uses_headers(monkeypatch):
+    header = "Basic " + base64.b64encode(b"dave:hunter2").decode("ascii")
+    monkeypatch.setattr(
+        basic_auth,
+        "_get_headers",
+        lambda: {"authorization": header},
+    )
+
+    creds = basic_auth.get_request_credentials()
+    assert creds == ("dave", "hunter2")
