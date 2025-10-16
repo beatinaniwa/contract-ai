@@ -1,4 +1,5 @@
 import hashlib
+import difflib
 import os
 from datetime import date as _dt_date
 from typing import Literal, cast
@@ -63,6 +64,37 @@ if isinstance(pending_updates, dict):
 
 # フォーム操作の有効/無効フラグ
 ui_disabled = bool(st.session_state.get("ui_locked", False))
+
+# 反映中オーバーレイ（全体グレーアウト + メッセージ）
+if ui_disabled:
+    overlay_html = f"""
+    <style>
+    .lock-overlay {{
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.25);
+        backdrop-filter: blur(1px);
+        z-index: 9999;
+    }}
+    .lock-overlay .message {{
+        position: absolute;
+        top: 12%;
+        left: 50%;
+        transform: translate(-50%, 0);
+        background: #ffffff;
+        color: #333;
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        font-size: 14px;
+        border: 1px solid #e6e6e6;
+    }}
+    </style>
+    <div class="lock-overlay">
+      <div class="message">⏳ {st.session_state.get('ui_busy_message') or 'AIの回答結果を反映しています…'}</div>
+    </div>
+    """
+    st.markdown(overlay_html, unsafe_allow_html=True)
 
 
 # ---- Q&A処理（背景実行用）: 送信後の次ラン先頭で実行し、完了したら再描画 ----
@@ -980,11 +1012,11 @@ with col_main:
         _render_line("概要_当社の契約活動概要および成果事業化概要", "our_overall_summary")
         _render_line("概要_相手の契約活動概要および成果事業化概要", "their_overall_summary")
 
-        # Before/After の視覚化
+        # Before/After の視覚化（diff で強調）
         diff_before = st.session_state.get("qa_diff_before")
         diff_after = st.session_state.get("qa_diff_after")
         if isinstance(diff_before, dict) and isinstance(diff_after, dict):
-            st.subheader("更新内容（Before/After）")
+            st.subheader("更新内容（差分）")
             items = [
                 ("どんな契約にしたいか", "desired_contract"),
                 ("概要_当社", "our_overall_summary"),
@@ -996,24 +1028,11 @@ with col_main:
                 if before_val == after_val:
                     continue
                 st.markdown(f"- {label}")
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.caption("Before")
-                    st.text_area(
-                        f"before_{key}",
-                        value=before_val,
-                        height=140,
-                        disabled=True,
-                        label_visibility="collapsed",
-                        key=f"qa_diff_before_{key}",
-                    )
-                with c2:
-                    st.caption("After")
-                    st.text_area(
-                        f"after_{key}",
-                        value=after_val,
-                        height=140,
-                        disabled=True,
-                        label_visibility="collapsed",
-                        key=f"qa_diff_after_{key}",
-                    )
+                diff_lines = difflib.unified_diff(
+                    before_val.splitlines(),
+                    after_val.splitlines(),
+                    fromfile="before",
+                    tofile="after",
+                    lineterm="",
+                )
+                st.code("\n".join(diff_lines), language="diff")
