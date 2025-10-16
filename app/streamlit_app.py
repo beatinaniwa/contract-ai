@@ -34,6 +34,8 @@ st.session_state.setdefault("uploaded_file_digest", None)
 # - AIが最後に適用した値（ベースライン）と現値が一致する場合のみ更新
 pending_updates = st.session_state.pop("pending_widget_updates", None)
 ai_baseline = st.session_state.setdefault("ai_baseline", {})
+st.session_state.setdefault("ui_locked", False)
+st.session_state.setdefault("ui_busy_message", "")
 
 
 def _apply_if_not_modified(key: str, value):
@@ -53,15 +55,24 @@ def _apply_if_not_modified(key: str, value):
 if isinstance(pending_updates, dict):
     for k, v in pending_updates.items():
         _apply_if_not_modified(k, v)
+    # 反映が終わったのでロック解除 & メッセージ消去
+    st.session_state["ui_locked"] = False
+    st.session_state["ui_busy_message"] = ""
+
+# フォーム操作の有効/無効フラグ
+ui_disabled = bool(st.session_state.get("ui_locked", False))
 
 col_left, col_right = st.columns([2, 1])
 
 with col_right:
     st.header("AIサポート")
+    if ui_disabled:
+        st.info("AIの回答結果を反映中です。しばらくお待ちください…")
     uploaded_file = st.file_uploader(
         "案件の概要や条件のファイルをアップロード",
         type=["pdf", "txt"],
         accept_multiple_files=False,
+        disabled=ui_disabled,
     )
 
     if uploaded_file is not None:
@@ -89,16 +100,17 @@ with col_right:
         "案件の概要や条件を自由に入力してください。",
         height=260,
         key="source_text_widget",
+        disabled=ui_disabled,
     )
     hc_col1, hc_col2 = st.columns([1, 1])
     with hc_col1:
-        if st.button("Gemini接続チェック", use_container_width=True):
+        if st.button("Gemini接続チェック", use_container_width=True, disabled=ui_disabled):
             ok, msg = gemini_healthcheck()
             if ok:
                 st.success("Gemini 2.5 Pro への接続はOKです。")
             else:
                 st.error(f"Gemini接続に問題があります: {msg}")
-    if st.button("AIでフォームに反映", type="primary", use_container_width=True):
+    if st.button("AIでフォームに反映", type="primary", use_container_width=True, disabled=ui_disabled):
         result = extract_contract_form(src_text)
         st.session_state["extracted"] = result
         st.session_state["source_text"] = src_text
@@ -191,6 +203,9 @@ col_main = col_left
 with col_main:
     st.subheader("フォーム（編集可）")
 
+    if ui_disabled:
+        st.info("AIの回答結果を反映中です。フォームは一時的に編集できません。")
+
     # 既存データの展開
     extracted = st.session_state.get("extracted", {"form": {}, "missing_fields": []})
     form_data = extracted.get("form", {})
@@ -207,14 +222,14 @@ with col_main:
         "normal_due_date_widget",
         form_data.get("normal_due_date") or form_data.get("desired_due_date") or _dt_date.today(),
     )
-    request_date = st.date_input("依頼日", key="request_date_widget")
-    normal_due_date = st.date_input("通常納期", key="normal_due_date_widget")
+    request_date = st.date_input("依頼日", key="request_date_widget", disabled=ui_disabled)
+    normal_due_date = st.date_input("通常納期", key="normal_due_date_widget", disabled=ui_disabled)
     _ensure_default("requester_department_widget", form_data.get("requester_department", ""))
-    requester_department = st.text_input("依頼者_所属", key="requester_department_widget")
+    requester_department = st.text_input("依頼者_所属", key="requester_department_widget", disabled=ui_disabled)
     _ensure_default("requester_manager_widget", form_data.get("requester_manager", ""))
-    requester_manager = st.text_input("依頼者_責任者", key="requester_manager_widget")
+    requester_manager = st.text_input("依頼者_責任者", key="requester_manager_widget", disabled=ui_disabled)
     _ensure_default("requester_staff_widget", form_data.get("requester_staff", ""))
-    requester_staff = st.text_input("依頼者_担当者", key="requester_staff_widget")
+    requester_staff = st.text_input("依頼者_担当者", key="requester_staff_widget", disabled=ui_disabled)
 
     # 案件_種別（最初に追加）
     project_type_options = vocab.get("project_type", [])
@@ -229,7 +244,7 @@ with col_main:
         else 0
     )
     project_type = st.selectbox(
-        "案件_種別", options=project_type_options or ["NDA"], index=project_type_index
+        "案件_種別", options=project_type_options or ["NDA"], index=project_type_index, disabled=ui_disabled
     )
 
     # 案件_国内外（2番目）
@@ -248,14 +263,15 @@ with col_main:
         "案件_国内外",
         options=project_domestic_foreign_options or ["国内"],
         index=pdf_index,
+        disabled=ui_disabled,
     )
 
     _ensure_default("project_name_widget", form_data.get("project_name", ""))
-    project_name = st.text_input("案件_案件名", key="project_name_widget")
+    project_name = st.text_input("案件_案件名", key="project_name_widget", disabled=ui_disabled)
     _ensure_default("activity_purpose_widget", form_data.get("activity_purpose", ""))
-    activity_purpose = st.text_area("案件_活動目的", height=80, key="activity_purpose_widget")
+    activity_purpose = st.text_area("案件_活動目的", height=80, key="activity_purpose_widget", disabled=ui_disabled)
     _ensure_default("activity_start_widget", form_data.get("activity_start", ""))
-    activity_start = st.text_input("案件_実活動時期", key="activity_start_widget")
+    activity_start = st.text_input("案件_実活動時期", key="activity_start_widget", disabled=ui_disabled)
 
     # 契約対象品目（単一選択）
     project_target_item_options = vocab.get(
@@ -272,14 +288,15 @@ with col_main:
         "契約対象品目",
         options=project_target_item_options,
         index=project_target_item_index,
+        disabled=ui_disabled,
     )
 
     _ensure_default("counterparty_name_widget", form_data.get("counterparty_name", ""))
-    counterparty_name = st.text_input("契約相手_名称", key="counterparty_name_widget")
+    counterparty_name = st.text_input("契約相手_名称", key="counterparty_name_widget", disabled=ui_disabled)
     _ensure_default("counterparty_address_widget", form_data.get("counterparty_address", ""))
-    counterparty_address = st.text_input("契約相手_所在地", key="counterparty_address_widget")
+    counterparty_address = st.text_input("契約相手_所在地", key="counterparty_address_widget", disabled=ui_disabled)
     _ensure_default("counterparty_profile_widget", form_data.get("counterparty_profile", ""))
-    counterparty_profile = st.text_area("契約相手_プロフィール", height=80, key="counterparty_profile_widget")
+    counterparty_profile = st.text_area("契約相手_プロフィール", height=80, key="counterparty_profile_widget", disabled=ui_disabled)
     # 概要_相手区分 + 条件付き: ソリューション技術企画室への相談有無（ここで表示）
     counterparty_type_options = vocab.get("counterparty_type", [])
     default_counterparty_type = form_data.get("counterparty_type")
@@ -296,6 +313,7 @@ with col_main:
         "概要_相手区分",
         options=counterparty_type_options or ["民間"],
         index=ct_index,
+        disabled=ui_disabled,
     )
     requires_solution_consult = counterparty_type in {
         "大学",
@@ -314,6 +332,7 @@ with col_main:
             "ソリューション技術企画室への相談有無",
             options=spo_options or ["未", "済"],
             index=spo_index,
+            disabled=ui_disabled,
         )
     else:
         solution_planning_office_consultation = ""
@@ -329,15 +348,16 @@ with col_main:
         if contract_form_options
         else 0
     )
-    contract_form = st.selectbox("概要_契約書式", options=contract_form_options, index=cf_index)
+    contract_form = st.selectbox("概要_契約書式", options=contract_form_options, index=cf_index, disabled=ui_disabled)
     related_contract_flag = st.selectbox(
         "概要_関連契約",
         options=vocab.get("related_contract_flag", ["該当なし", "該当あり"]),
         index=0,
+        disabled=ui_disabled,
     )
 
     _ensure_default("amount_jpy_widget", int(form_data.get("amount_jpy", 0)))
-    amount_jpy = st.number_input("概要_金額", min_value=0, step=1000, key="amount_jpy_widget")
+    amount_jpy = st.number_input("概要_金額", min_value=0, step=1000, key="amount_jpy_widget", disabled=ui_disabled)
 
     # 開示される情報
     info_options = vocab.get(
@@ -348,6 +368,7 @@ with col_main:
         "概要_開示される情報_当社から",
         options=info_options,
         default=form_data.get("info_from_us", []),
+        disabled=ui_disabled,
     )
     info_from_us_other = st.text_input(
         "概要_開示される情報_当社から_その他",
@@ -355,12 +376,14 @@ with col_main:
         placeholder="他に開示予定があれば記入（空でも可）",
         help="選択肢にない開示事項があれば1行で記入。未入力可。",
         key="info_from_us_other",
+        disabled=ui_disabled,
     )
 
     info_from_them: List[str] = st.multiselect(
         "概要_開示される情報_相手から",
         options=info_options,
         default=form_data.get("info_from_them", []),
+        disabled=ui_disabled,
     )
     info_from_them_other = st.text_input(
         "概要_開示される情報_相手から_その他",
@@ -368,6 +391,7 @@ with col_main:
         placeholder="他に相手からの開示があれば記入（空でも可）",
         help="選択肢にない相手からの開示事項があれば1行で記入。未入力可。",
         key="info_from_them_other",
+        disabled=ui_disabled,
     )
 
     our_overall_summary_default = form_data.get("our_overall_summary")
@@ -384,6 +408,7 @@ with col_main:
         "概要_当社の契約活動概要および成果事業化概要",
         height=100,
         key="our_overall_summary_widget",
+        disabled=ui_disabled,
     )
 
     their_overall_summary_default = form_data.get("their_overall_summary")
@@ -399,6 +424,7 @@ with col_main:
         "概要_相手の契約活動概要および成果事業化概要",
         height=100,
         key="their_overall_summary_widget",
+        disabled=ui_disabled,
     )
 
     # 「どんな契約にしたいか」のガイダンス（テキストエリアの外に説明を表示）
@@ -471,9 +497,10 @@ with col_main:
         height=300,
         help="番号に続けて内容を記入。必要に応じて各番号の下に '- ' で箇条書きも可。",
         key="desired_contract_widget",
+        disabled=ui_disabled,
     )
 
-    submitted = st.button("CSV出力", type="primary")
+    submitted = st.button("CSV出力", type="primary", disabled=ui_disabled)
 
     if submitted:
         # 旧 related_contracts 文字列からのフォールバック: 非空なら該当あり
@@ -585,6 +612,7 @@ with col_main:
                 key=ans_key,
                 height=60,
                 placeholder="（任意）必要十分な記載にするための補足を記入。未入力でも可。",
+                disabled=ui_disabled,
             )
 
         def _map_question_to_section(question: str) -> int | None:
@@ -633,7 +661,7 @@ with col_main:
                 chunks.append(chunk)
             return "\n\n".join(chunks)
 
-        if st.button("回答を送信", type="secondary", use_container_width=True):
+        if st.button("回答を送信", type="secondary", use_container_width=True, disabled=ui_disabled):
             form_data = extracted_payload.get("form", {})
             source_text = st.session_state.get("source_text", "")
             base_dc = (
@@ -659,15 +687,19 @@ with col_main:
             gemini_error: str | None = None
             try:
                 if answered_qas:
-                    updated = update_contract_sections_with_gemini(
-                        source_text=source_text,
-                        current_values={
-                            "desired_contract": base_dc or "",
-                            "our_overall_summary": our_summary or "",
-                            "their_overall_summary": their_summary or "",
-                        },
-                        qa=answered_qas,
-                    )
+                    # UIロックして処理中インジケータを表示
+                    st.session_state["ui_locked"] = True
+                    st.session_state["ui_busy_message"] = "AIの回答結果を反映しています…"
+                    with st.spinner("AIの回答結果を反映しています…"):
+                        updated = update_contract_sections_with_gemini(
+                            source_text=source_text,
+                            current_values={
+                                "desired_contract": base_dc or "",
+                                "our_overall_summary": our_summary or "",
+                                "their_overall_summary": their_summary or "",
+                            },
+                            qa=answered_qas,
+                        )
                     engine_status = "gemini"
                     updated_dc = updated.get("desired_contract", base_dc) or base_dc
                     our_summary = updated.get("our_overall_summary", our_summary) or our_summary
