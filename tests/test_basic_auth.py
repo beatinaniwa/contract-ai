@@ -3,6 +3,8 @@ import hashlib
 import sys
 from pathlib import Path
 
+import pytest
+
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -90,3 +92,145 @@ def test_get_request_credentials_uses_headers(monkeypatch):
 
     creds = basic_auth.get_request_credentials()
     assert creds == ("dave", "hunter2")
+
+
+class StopCalled(Exception):
+    pass
+
+
+class DummyPlaceholder:
+    def __init__(self, sink):
+        self.sink = sink
+
+    def info(self, message):
+        self.sink.append(("info", message))
+
+    def error(self, message):
+        self.sink.append(("error", message))
+
+    def success(self, message):
+        self.sink.append(("success", message))
+
+
+class DummyForm:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class DummyStreamlit:
+    def __init__(self):
+        self.session_state: dict[str, object] = {}
+        self._messages: list[tuple[str, str]] = []
+        self.username_response = ""
+        self.password_response = ""
+        self.submit_response = False
+
+    def empty(self):
+        return DummyPlaceholder(self._messages)
+
+    def form(self, key, clear_on_submit=False):
+        return DummyForm()
+
+    def text_input(self, label, key=None, type="text"):
+        if "ユーザーID" in label:
+            return self.username_response
+        return self.password_response
+
+    def form_submit_button(self, label):
+        return self.submit_response
+
+    def stop(self):
+        raise StopCalled()
+
+    def messages(self):
+        return list(self._messages)
+
+
+def test_render_login_form_success(monkeypatch):
+    _configure_secrets(
+        monkeypatch,
+        {
+            "basic_auth_username": "erin",
+            "basic_auth_password": "letmein",
+        },
+    )
+    config = basic_auth.get_basic_auth_config()
+    assert config is not None
+
+    stub = DummyStreamlit()
+    stub.username_response = "erin"
+    stub.password_response = "letmein"
+    stub.submit_response = True
+
+    monkeypatch.setattr(basic_auth, "st", stub)
+
+    assert basic_auth.render_login_form(config) is True
+    assert stub.session_state[basic_auth._SESSION_AUTH_FLAG] is True  # type: ignore[attr-defined]
+    assert ("success", "認証に成功しました。") in stub.messages()
+
+
+def test_render_login_form_failure(monkeypatch):
+    _configure_secrets(
+        monkeypatch,
+        {
+            "basic_auth_username": "frank",
+            "basic_auth_password": "open-sesame",
+        },
+    )
+    config = basic_auth.get_basic_auth_config()
+    assert config is not None
+
+    stub = DummyStreamlit()
+    stub.username_response = "frank"
+    stub.password_response = "wrong"
+    stub.submit_response = True
+
+    monkeypatch.setattr(basic_auth, "st", stub)
+
+    assert basic_auth.render_login_form(config) is False
+    assert basic_auth._SESSION_AUTH_FLAG not in stub.session_state  # type: ignore[attr-defined]
+    assert stub.session_state[basic_auth._SESSION_ERROR_FLAG] == "ID またはパスワードが違います。"  # type: ignore[attr-defined]
+    assert ("error", "ID またはパスワードが違います。") in stub.messages()
+
+
+def test_require_basic_auth_accepts_header(monkeypatch):
+    _configure_secrets(
+        monkeypatch,
+        {
+            "basic_auth_username": "gina",
+            "basic_auth_password": "hunter2",
+        },
+    )
+
+    stub = DummyStreamlit()
+    monkeypatch.setattr(basic_auth, "st", stub)
+    monkeypatch.setattr(
+        basic_auth,
+        "get_request_credentials",
+        lambda: ("gina", "hunter2"),
+    )
+
+    basic_auth.require_basic_auth()
+    assert stub.session_state[basic_auth._SESSION_AUTH_FLAG] is True  # type: ignore[attr-defined]
+
+
+def test_require_basic_auth_prompts_and_stops(monkeypatch):
+    _configure_secrets(
+        monkeypatch,
+        {
+            "basic_auth_username": "henry",
+            "basic_auth_password": "secret",
+        },
+    )
+
+    stub = DummyStreamlit()
+    monkeypatch.setattr(basic_auth, "st", stub)
+    monkeypatch.setattr(basic_auth, "get_request_credentials", lambda: None)
+
+    with pytest.raises(StopCalled):
+        basic_auth.require_basic_auth()
+
+    assert ("info", "Basic 認証が必要です。ユーザーIDとパスワードを入力してください。") in stub.messages()

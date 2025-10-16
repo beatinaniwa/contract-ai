@@ -32,6 +32,13 @@ def _hash_password(raw_password: str) -> str:
     return hashlib.sha256(raw_password.encode("utf-8")).hexdigest()
 
 
+_SESSION_AUTH_FLAG = "basic_auth_authenticated"
+_SESSION_ERROR_FLAG = "basic_auth_error"
+_FORM_KEY = "basic_auth_form"
+_USERNAME_INPUT_KEY = "basic_auth_username_input"
+_PASSWORD_INPUT_KEY = "basic_auth_password_input"
+
+
 @lru_cache(maxsize=1)
 def get_basic_auth_config() -> BasicAuthConfig | None:
     """Read basic auth settings from secrets.
@@ -127,11 +134,85 @@ def credentials_match(
     return hmac.compare_digest(hashed, config.password_hash)
 
 
+def _mark_session_authenticated() -> None:
+    if st is None:
+        return
+    st.session_state[_SESSION_AUTH_FLAG] = True
+
+
+def _is_session_authenticated() -> bool:
+    if st is None:
+        return False
+    return bool(st.session_state.get(_SESSION_AUTH_FLAG))
+
+
+def render_login_form(config: BasicAuthConfig) -> bool:
+    """Show a simple login form when running without an Authorization header."""
+    if st is None:
+        return False
+
+    message_box = st.empty()
+    previous_error = None
+    if _SESSION_ERROR_FLAG in st.session_state:
+        previous_error = st.session_state.pop(_SESSION_ERROR_FLAG, None)
+
+    if previous_error:
+        message_box.error(previous_error)
+    else:
+        message_box.info("Basic 認証が必要です。ユーザーIDとパスワードを入力してください。")
+
+    with st.form(key=_FORM_KEY, clear_on_submit=False):
+        username = st.text_input("ユーザーID", key=_USERNAME_INPUT_KEY)
+        password = st.text_input(
+            "パスワード", type="password", key=_PASSWORD_INPUT_KEY
+        )
+        submitted = st.form_submit_button("ログイン")
+
+    if not submitted:
+        return False
+
+    if credentials_match((username, password), config):
+        _mark_session_authenticated()
+        st.session_state.pop(_SESSION_ERROR_FLAG, None)
+        message_box.success("認証に成功しました。")
+        return True
+
+    error_message = "ID またはパスワードが違います。"
+    st.session_state[_SESSION_ERROR_FLAG] = error_message
+    message_box.error(error_message)
+    return False
+
+
+def require_basic_auth() -> None:
+    """Ensure the current request is authenticated before proceeding."""
+    config = get_basic_auth_config()
+    if not config:
+        return
+
+    if _is_session_authenticated():
+        return
+
+    provided_credentials = get_request_credentials()
+    if credentials_match(provided_credentials, config):
+        _mark_session_authenticated()
+        return
+
+    if st is None:
+        raise PermissionError("Basic authentication required but Streamlit is unavailable.")
+
+    if render_login_form(config):
+        return
+
+    st.stop()
+
+
 __all__ = [
     "BasicAuthConfig",
     "credentials_match",
     "get_basic_auth_config",
     "get_request_credentials",
     "parse_basic_authorization_header",
+    "render_login_form",
+    "require_basic_auth",
     "reset_basic_auth_cache",
 ]
