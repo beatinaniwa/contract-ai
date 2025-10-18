@@ -1,5 +1,4 @@
 import sys
-from datetime import date
 from pathlib import Path
 
 APP_DIR = Path(__file__).resolve().parents[1] / "app"
@@ -25,12 +24,20 @@ def test_extract_contract_form_without_api_key(monkeypatch, tmp_path):
     config_loader.load_secrets.cache_clear()
     extractor._get_client.cache_clear()
 
-    sample = "案件名: テスト案件\n相手先: テスト株式会社\n金額: 120万円\n"
+    sample = (
+        "所属：事業開発部\n"
+        "対象商材: AI分析サービス\n"
+        "活動背景: 顧客要望の増加への対応\n"
+        "相手方との関係: 既にNDA締結済みの販売代理店\n"
+        "活動内容: PoCと販売契約交渉を実施予定\n"
+    )
     result = extractor.extract_contract_form(sample)
 
-    assert result["form"]["project_name"] == "テスト案件"
-    assert result["form"]["counterparty_name"] == "テスト株式会社"
-    assert result["form"]["amount_jpy"] == 1_200_000
+    assert result["form"]["affiliation"] == "事業開発部"
+    assert result["form"]["target_product"] == "AI分析サービス"
+    assert result["form"]["activity_background"] == "顧客要望の増加への対応"
+    assert result["form"]["counterparty_relationship"] == "既にNDA締結済みの販売代理店"
+    assert result["form"]["activity_details"] == "PoCと販売契約交渉を実施予定"
     assert result["missing_fields"] == []
     assert "error" in result
 
@@ -45,11 +52,11 @@ def test_extract_contract_form_uses_gemini_payload(monkeypatch, tmp_path):
 
     fake_payload = {
         "form": {
-            "project_name": "Gemini案件",
-            "counterparty_name": "合同会社サンプル",
-            "amount_jpy": 3_500_000,
-            "request_date": "2024-03-01",
-            "counterparty_type": "民間",
+            "affiliation": "経営企画本部",
+            "target_product": "ロボティクスプラットフォーム",
+            "activity_background": "国内市場での拡販が目的",
+            "counterparty_relationship": "販売代理店と既に基本契約を締結済み",
+            "activity_details": "共同セミナーと営業訪問を実施予定",
         }
     }
 
@@ -58,8 +65,9 @@ def test_extract_contract_form_uses_gemini_payload(monkeypatch, tmp_path):
     result = extractor.extract_contract_form("入力テキスト")
 
     assert "error" not in result
-    assert result["form"]["project_name"] == "Gemini案件"
-    assert result["form"]["counterparty_name"] == "合同会社サンプル"
-    assert result["form"]["amount_jpy"] == 3_500_000
-    assert result["form"]["request_date"] == date(2024, 3, 1)
+    assert result["form"]["affiliation"] == "経営企画本部"
+    assert result["form"]["target_product"] == "ロボティクスプラットフォーム"
+    assert result["form"]["activity_background"] == "国内市場での拡販が目的"
+    assert result["form"]["counterparty_relationship"] == "販売代理店と既に基本契約を締結済み"
+    assert result["form"]["activity_details"] == "共同セミナーと営業訪問を実施予定"
     assert result["missing_fields"] == []
