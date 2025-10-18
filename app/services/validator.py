@@ -2,9 +2,11 @@ from typing import List, Tuple
 from models.schemas import ContractForm
 
 REQUIRED_FIELDS = [
-    "project_name",
-    "counterparty_name",
-    "amount_jpy",
+    "affiliation",
+    "target_product",
+    "activity_background",
+    "counterparty_relationship",
+    "activity_details",
 ]
 
 def validate_form(form: ContractForm) -> Tuple[bool, List[str]]:
