@@ -3,24 +3,15 @@
 from __future__ import annotations
 
 import io
-import logging
+from collections.abc import Iterable
 from pathlib import Path
 
-from google.genai import types
 from pypdf import PdfReader
-
-from .gemini_client import GEMINI_MODEL_NAME, GeminiConfigError, get_client as _get_gemini_client
-
-logger = logging.getLogger(__name__)
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.exc import PackageNotFoundError
 
 _TEXT_EXTENSIONS = {".txt", ".md", ".markdown"}
-_PPTX_MIME_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-
-PPTX_EXTRACTION_PROMPT = (
-    "アップロードされたPowerPointファイルから各スライドのタイトルと本文に含まれるテキストを順番に抽出してください。"
-    "スライドごとに「[Slide X]」の見出しを付け、その下に箇条書きで主要なテキストをまとめてください。"
-    "出力はプレーンテキストのみとし、余分な解説やマークダウンは含めないでください。"
-)
 
 
 def load_text_from_bytes(data: bytes, filename: str) -> str:
@@ -77,30 +68,66 @@ def _extract_pdf_text(data: bytes) -> str:
 
 def _extract_pptx_text(data: bytes) -> str:
     try:
-        client = _get_gemini_client()
-    except GeminiConfigError as exc:
-        raise ValueError(f"Geminiの設定に問題があります: {exc}") from exc
+        presentation = Presentation(io.BytesIO(data))
+    except PackageNotFoundError as exc:
+        raise ValueError("PPTXファイルが破損している可能性があります。") from exc
+    except Exception as exc:  # pragma: no cover - python-pptx internal errors are rare
+        raise ValueError("PPTXファイルの読み込みに失敗しました。") from exc
 
-    parts = [
-        types.Part.from_bytes(data=data, mime_type=_PPTX_MIME_TYPE),
-        types.Part.from_text(text=PPTX_EXTRACTION_PROMPT),
-    ]
+    slides_output: list[str] = []
+    for index, slide in enumerate(presentation.slides, start=1):
+        lines = list(_iter_slide_text(slide))
+        if not lines:
+            continue
+        bullets = "\n".join(f"- {line}" for line in _deduplicate_preserving_order(lines))
+        slides_output.append(f"[Slide {index}]\n{bullets}")
 
-    try:
-        response = client.models.generate_content(
-            model=GEMINI_MODEL_NAME,
-            contents=types.Content(role="user", parts=parts),
-        )
-    except Exception as exc:  # pragma: no cover - external API variations
-        logger.exception("Gemini PPTX extraction failed")
-        raise ValueError("GeminiによるPPTXの読み取りに失敗しました。") from exc
+    if not slides_output:
+        raise ValueError("PPTXからテキストを抽出できませんでした。")
 
-    feedback = getattr(response, "prompt_feedback", None)
-    if feedback and getattr(feedback, "block_reason", None):
-        raise ValueError(f"Geminiの安全フィルタによりブロックされました: {feedback.block_reason}")
+    return "\n\n".join(slides_output)
 
-    content = getattr(response, "text", None)
-    if not content:
-        raise ValueError("Geminiの応答が空でした。")
 
-    return content.strip()
+def _iter_slide_text(slide) -> Iterable[str]:
+    for shape in slide.shapes:
+        yield from _iter_shape_text(shape)
+
+
+def _iter_shape_text(shape) -> Iterable[str]:
+    shape_type = getattr(shape, "shape_type", None)
+    if shape_type == MSO_SHAPE_TYPE.GROUP:
+        for subshape in shape.shapes:
+            yield from _iter_shape_text(subshape)
+        return
+
+    if getattr(shape, "has_text_frame", False):
+        text_frame = shape.text_frame
+        for paragraph in getattr(text_frame, "paragraphs", []):
+            text = "".join(run.text for run in getattr(paragraph, "runs", [])).strip()
+            if text:
+                for line in text.splitlines():
+                    cleaned = line.strip()
+                    if cleaned:
+                        yield cleaned
+        return
+
+    if getattr(shape, "has_table", False):
+        table = shape.table
+        for row in table.rows:
+            for cell in row.cells:
+                for line in cell.text.splitlines():
+                    cleaned = line.strip()
+                    if cleaned:
+                        yield cleaned
+        return
+
+
+def _deduplicate_preserving_order(lines: list[str]) -> list[str]:
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for line in lines:
+        normalized = " ".join(line.split())
+        if normalized and normalized not in seen:
+            deduped.append(normalized)
+            seen.add(normalized)
+    return deduped
