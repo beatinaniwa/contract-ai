@@ -5,15 +5,17 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Mapping
+from typing import Any, Callable, Mapping
 
 from config_loader import load_secret
 
+st: Any
 try:  # pragma: no cover - streamlit may not be importable in some contexts
     import streamlit as st
 except Exception:  # pragma: no cover - keep optional dependency soft
     st = None
 
+_get_websocket_headers: Callable[[], Mapping[str, str] | None] | None
 try:
     from streamlit.web.server.websocket_headers import _get_websocket_headers
 except Exception:  # pragma: no cover - streamlit fallback when not running in app context
