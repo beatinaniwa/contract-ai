@@ -2,26 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
-from functools import lru_cache
-from typing import Any, Dict, Sequence, cast, Iterable
+from typing import Any, Dict, Sequence, cast
 
-from google import genai
 from pydantic import ValidationError
 
 from models.schemas import ContractForm
-from config_loader import ConfigNotFoundError, load_secret
+from .gemini_client import GEMINI_MODEL_NAME, GeminiConfigError, get_client as _get_client
 from .validator import validate_form
 
 logger = logging.getLogger(__name__)
-
-
-class GeminiConfigError(RuntimeError):
-    """Raised when Gemini configuration is missing or invalid."""
-
-
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 FORM_FIELD_NAMES = [name for name in ContractForm.model_fields if name != "source_text"]
 PROMPT_TEMPLATE = """
 あなたは日本語の打ち合わせメモから契約申請フォームの情報を抽出するアシスタントです。
@@ -453,21 +443,3 @@ def _load_json(raw_text: str) -> Dict[str, Any]:
         return json.loads(cleaned)
     except json.JSONDecodeError as exc:
         raise ValueError("Gemini応答のJSON解析に失敗しました") from exc
-
-
-def _get_api_key() -> str:
-    try:
-        api_key = load_secret("gemini_api_key")
-    except ConfigNotFoundError as exc:
-        raise GeminiConfigError(str(exc)) from exc
-
-    if not api_key:
-        raise GeminiConfigError(".streamlit/secrets.toml に gemini_api_key を設定してください。")
-
-    return api_key
-
-
-@lru_cache(maxsize=1)
-def _get_client():
-    api_key = _get_api_key()
-    return genai.Client(api_key=api_key)

@@ -121,8 +121,8 @@ st.title("契約書作成アシスタント")
 
 st.subheader("元テキスト")
 uploaded_file = st.file_uploader(
-    "資料をアップロード（txt / md / pdf）",
-    type=["txt", "md", "markdown", "pdf"],
+    "資料をアップロード（txt / md / pdf / pptx）",
+    type=["txt", "md", "markdown", "pdf", "pptx"],
     accept_multiple_files=False,
 )
 if uploaded_file is not None:
