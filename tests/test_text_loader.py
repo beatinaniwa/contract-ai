@@ -1,6 +1,7 @@
 import io
 
 import pytest
+from pptx import Presentation
 
 from services.text_loader import load_text_from_bytes
 
@@ -42,6 +43,19 @@ def _make_pdf_with_text(text: str) -> bytes:
     return buffer.getvalue()
 
 
+def _make_pptx_with_slides(slides: list[tuple[str, list[str]]]) -> bytes:
+    presentation = Presentation()
+    layout = presentation.slide_layouts[1]  # Title and Content
+    for title, bullet_points in slides:
+        slide = presentation.slides.add_slide(layout)
+        slide.shapes.title.text = title
+        body = slide.placeholders[1]
+        body.text = "\n".join(bullet_points)
+    buffer = io.BytesIO()
+    presentation.save(buffer)
+    return buffer.getvalue()
+
+
 def test_load_text_from_txt_bytes():
     content = "案件概要を記載したサンプルテキストです。\n詳細条件も含まれます。"
     result = load_text_from_bytes(content.encode("utf-8"), "sample.txt")
@@ -65,23 +79,23 @@ def test_load_text_from_bytes_raises_for_empty_payload():
         load_text_from_bytes(b"", "empty.txt")
 
 
-def test_load_text_from_pptx_bytes(monkeypatch):
-    captured = {}
+def test_load_text_from_pptx_bytes_extracts_slide_text():
+    pptx_bytes = _make_pptx_with_slides(
+        [
+            ("提案概要", ["条件A", "条件B"]),
+            ("スケジュール", ["開始日: 4/1"]),
+        ]
+    )
 
-    def fake_extract(data: bytes) -> str:
-        captured["data"] = data
-        return "[Slide 1]\n- 内容"
+    result = load_text_from_bytes(pptx_bytes, "slides.pptx")
 
-    monkeypatch.setattr("services.text_loader._extract_pptx_text", fake_extract)
-    result = load_text_from_bytes(b"pptx-bytes", "slides.pptx")
-    assert result == "[Slide 1]\n- 内容"
-    assert captured["data"] == b"pptx-bytes"
+    assert "[Slide 1]" in result
+    assert "- 提案概要" in result
+    assert "- 条件A" in result
+    assert "[Slide 2]" in result
+    assert "- スケジュール" in result
 
 
-def test_load_text_from_pptx_bytes_propagates_error(monkeypatch):
-    def fake_extract(_: bytes) -> str:
-        raise ValueError("Gemini error")
-
-    monkeypatch.setattr("services.text_loader._extract_pptx_text", fake_extract)
+def test_load_text_from_pptx_bytes_raises_for_invalid_file():
     with pytest.raises(ValueError):
-        load_text_from_bytes(b"pptx-bytes", "slides.pptx")
+        load_text_from_bytes(b"not-a-pptx", "slides.pptx")

@@ -354,7 +354,7 @@ if follow_up_feedback_message:
                     continue
                 action = info.get("action", "unknown")
                 reason = info.get("reason", "")
-                label = FIELD_LABELS.get(field, field)
+                label = FIELD_LABELS.get(field) or field
                 action_label = "更新" if action == "updated" else "変更なし"
                 st.write(f"- {label}: {action_label} — {reason}")
 
