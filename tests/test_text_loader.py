@@ -63,3 +63,25 @@ def test_load_text_from_bytes_raises_for_unknown_extension():
 def test_load_text_from_bytes_raises_for_empty_payload():
     with pytest.raises(ValueError):
         load_text_from_bytes(b"", "empty.txt")
+
+
+def test_load_text_from_pptx_bytes(monkeypatch):
+    captured = {}
+
+    def fake_extract(data: bytes) -> str:
+        captured["data"] = data
+        return "[Slide 1]\n- 内容"
+
+    monkeypatch.setattr("services.text_loader._extract_pptx_text", fake_extract)
+    result = load_text_from_bytes(b"pptx-bytes", "slides.pptx")
+    assert result == "[Slide 1]\n- 内容"
+    assert captured["data"] == b"pptx-bytes"
+
+
+def test_load_text_from_pptx_bytes_propagates_error(monkeypatch):
+    def fake_extract(_: bytes) -> str:
+        raise ValueError("Gemini error")
+
+    monkeypatch.setattr("services.text_loader._extract_pptx_text", fake_extract)
+    with pytest.raises(ValueError):
+        load_text_from_bytes(b"pptx-bytes", "slides.pptx")

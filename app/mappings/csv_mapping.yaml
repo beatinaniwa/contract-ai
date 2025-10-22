@@ -1,70 +1,14 @@
 headers:
-  - 依頼日
-  - 通常納期
-
-  - 依頼者_所属
-  - 依頼者_責任者
-  - 依頼者_担当者
-
-  - 案件_種別
-  - 案件_国内外
-  - 案件_案件名
-  - 案件_活動目的
-  - 案件_実活動時期
-  - 案件_契約対象品目
-
-  - 契約相手_名称
-  - 契約相手_所在地
-  - 契約相手_プロフィール
-
-  - 概要_相手区分
-  - ソリューション技術企画室への相談有無
-  - 概要_契約書式
-  - 概要_関連契約
-  - 概要_金額
-
-  - 概要_開示される情報_当社から
-  - 概要_開示される情報_相手から
-  - 概要_開示される情報_当社から_その他
-  - 概要_開示される情報_相手から_その他
-
-  - 概要_当社の契約活動概要および成果事業化概要
-  - 概要_相手の契約活動概要および成果事業化概要
-
-  - どんな契約にしたいか
+  - 所属(部署名まで)
+  - 対象商材
+  - 活動背景・目的
+  - 相手方との関係・既締結の関連契約など
+  - 活動内容
 
 # フィールド -> カラム名
 fields:
-  request_date: 依頼日
-  normal_due_date: 通常納期
-
-  requester_department: 依頼者_所属
-  requester_manager: 依頼者_責任者
-  requester_staff: 依頼者_担当者
-
-  project_name: 案件_案件名
-  project_type: 案件_種別
-  project_domestic_foreign: 案件_国内外
-  activity_purpose: 案件_活動目的
-  activity_start: 案件_実活動時期
-  project_target_item: 案件_契約対象品目
-
-  counterparty_name: 契約相手_名称
-  counterparty_address: 契約相手_所在地
-  counterparty_profile: 契約相手_プロフィール
-
-  counterparty_type: 概要_相手区分
-  solution_planning_office_consultation: ソリューション技術企画室への相談有無
-  contract_form: 概要_契約書式
-  related_contract_flag: 概要_関連契約
-  amount_jpy: 概要_金額
-
-  info_from_us: 概要_開示される情報_当社から
-  info_from_them: 概要_開示される情報_相手から
-  info_from_us_other: 概要_開示される情報_当社から_その他
-  info_from_them_other: 概要_開示される情報_相手から_その他
-
-  our_overall_summary: 概要_当社の契約活動概要および成果事業化概要
-  their_overall_summary: 概要_相手の契約活動概要および成果事業化概要
-
-  desired_contract: どんな契約にしたいか
+  affiliation: 所属(部署名まで)
+  target_product: 対象商材
+  activity_background: 活動背景・目的
+  counterparty_relationship: 相手方との関係・既締結の関連契約など
+  activity_details: 活動内容
