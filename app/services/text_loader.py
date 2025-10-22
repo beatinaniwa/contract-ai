@@ -83,13 +83,13 @@ def _extract_pptx_text(data: bytes) -> str:
 
     parts = [
         types.Part.from_bytes(data=data, mime_type=_PPTX_MIME_TYPE),
-        types.Part.from_text(PPTX_EXTRACTION_PROMPT),
+        types.Part.from_text(text=PPTX_EXTRACTION_PROMPT),
     ]
 
     try:
         response = client.models.generate_content(
             model=GEMINI_MODEL_NAME,
-            contents=[types.Content(role="user", parts=parts)],
+            contents=types.Content(role="user", parts=parts),
         )
     except Exception as exc:  # pragma: no cover - external API variations
         logger.exception("Gemini PPTX extraction failed")
