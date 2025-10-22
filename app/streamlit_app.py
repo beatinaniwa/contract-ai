@@ -1,23 +1,24 @@
 from __future__ import annotations
 
+import datetime as dt
 import hashlib
+import json
 import os
 from typing import Any, Dict, Iterable, Tuple
 
 import streamlit as st
 import yaml
+import streamlit.components.v1 as components
 
 from models.schemas import ContractForm
-from services.audit import save_audit_log
 from services.basic_auth import require_basic_auth
-from services.csv_writer import write_csv
 from services.extractor import extract_contract_form, update_form_with_followups
+from services.plaintext_writer import format_form_as_text
 from services.text_loader import load_text_from_bytes
 from services.validator import validate_form
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MAPPING = os.path.join(BASE_DIR, "mappings", "csv_mapping.yaml")
-SAMPLE_INPUT = os.path.join(BASE_DIR, "sample_data", "example_input.txt")
 
 FORM_FIELDS: Tuple[Tuple[str, str, str], ...] = (
     ("affiliation", "所属(部署名まで)", "text_input"),
@@ -64,11 +65,46 @@ def _labels_for_missing(keys: Iterable[str]) -> Iterable[str]:
         yield mapping.get(key, key)
 
 
-def _load_sample_text() -> str:
-    if not os.path.exists(SAMPLE_INPUT):
-        return ""
-    with open(SAMPLE_INPUT, "r", encoding="utf-8") as f_txt:
-        return f_txt.read().strip()
+def _render_copy_button(text: str, *, key: str = "copy-export-text") -> None:
+    """Render a copy-to-clipboard button for the given text."""
+    safe_payload = json.dumps(text).replace("</", "<\\/")
+    components.html(
+        f"""
+        <div style="margin-top:0.5rem;">
+            <button id="{key}" style="
+                background-color:#2c71f0;
+                color:white;
+                border:none;
+                border-radius:4px;
+                padding:0.4rem 1.2rem;
+                cursor:pointer;
+                font-size:0.9rem;
+            ">
+                コピー
+            </button>
+        </div>
+        <script>
+        (function() {{
+            const btn = document.getElementById("{key}");
+            if (!btn) return;
+            btn.addEventListener("click", async () => {{
+                const original = btn.innerText;
+                try {{
+                    await navigator.clipboard.writeText({safe_payload});
+                    btn.innerText = "コピーしました";
+                }} catch (err) {{
+                    console.error("Copy failed", err);
+                    btn.innerText = "コピー失敗";
+                }}
+                setTimeout(() => {{
+                    btn.innerText = original;
+                }}, 1600);
+            }});
+        }})();
+        </script>
+        """,
+        height=80,
+    )
 
 
 st.set_page_config(page_title="契約書作成アシスタント", layout="wide")
@@ -139,15 +175,6 @@ if uploaded_file is not None:
             st.session_state["uploaded_file_digest"] = digest
             st.success("ファイルを読み込みました。")
 
-if st.button("サンプル入力を読み込む", use_container_width=True):
-    sample_text = _load_sample_text()
-    if sample_text:
-        st.session_state["source_text"] = sample_text
-        st.session_state["source_text_widget"] = sample_text
-        st.info("サンプルテキストを読み込みました。")
-    else:
-        st.warning("サンプルテキストが見つかりませんでした。")
-
 source_text = st.text_area(
     "AI抽出に使用するテキスト",
     key="source_text_widget",
@@ -163,7 +190,7 @@ if st.button(
     disabled=disabled_extract,
     type="primary",
 ):
-    with st.spinner("Geminiから情報を抽出しています…"):
+    with st.spinner("Geminiで情報を抽出しています…"):
         result = extract_contract_form(source_text)
     st.session_state["extracted"] = result
     st.session_state["extract_error"] = result.get("error")
@@ -181,7 +208,7 @@ for field, label, widget_type in FORM_FIELDS:
     else:
         st.text_area(label, key=key, height=160)
 
-submitted = st.button("CSV出力", type="primary", use_container_width=True)
+submitted = st.button("テキスト出力", type="primary", use_container_width=True)
 if submitted:
     form_payload = {
         field: st.session_state.get(f"{field}_widget") or None for field, _, _ in FORM_FIELDS
@@ -195,30 +222,27 @@ if submitted:
         labels = ", ".join(_labels_for_missing(missing))
         st.error(f"必須項目を入力してください: {labels}")
     else:
-        out_dir = os.path.join(os.getcwd(), "outputs")
-        out_path = write_csv(cf.model_dump(), MAPPING, out_dir=out_dir)
-        st.success("CSVを生成しました。下記からダウンロードできます。")
-        with open(out_path, "rb") as f_csv:
-            st.download_button(
-                "CSVをダウンロード",
-                data=f_csv,
-                file_name=os.path.basename(out_path),
-                mime="text/csv",
-            )
-        audit_path = save_audit_log(
-            cf.model_dump(),
-            st.session_state.get("source_text", ""),
-            out_path,
-            out_dir=out_dir,
+        export_text = format_form_as_text(cf.model_dump())
+        file_name = f"contract_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        st.success("プレーンテキストを生成しました。下記からダウンロードできます。")
+        st.markdown("#### 出力結果")
+        st.code(export_text, language="text")
+        _render_copy_button(export_text)
+        st.download_button(
+            "テキストをダウンロード",
+            data=export_text,
+            file_name=file_name,
+            mime="text/plain",
         )
-        st.caption(f"監査ログを保存しました: {os.path.basename(audit_path)}")
 
 follow_up_questions = st.session_state.get("follow_up_questions") or []
 current_follow_up_round = int(st.session_state.get("follow_up_round", 0))
 if follow_up_questions and current_follow_up_round <= 0:
     current_follow_up_round = 1
 follow_up_feedback_message = follow_up_feedback_data
-follow_up_explanation = follow_up_explanation_data if isinstance(follow_up_explanation_data, dict) else None
+follow_up_explanation = (
+    follow_up_explanation_data if isinstance(follow_up_explanation_data, dict) else None
+)
 
 if follow_up_questions and current_follow_up_round <= MAX_FOLLOW_UP_ROUNDS:
     st.subheader("追加で確認したい点")
@@ -240,12 +264,13 @@ if follow_up_questions and current_follow_up_round <= MAX_FOLLOW_UP_ROUNDS:
             f"回答{idx}",
             key=answer_key,
             height=80,
-            placeholder="必要があればここに回答内容をメモしてください。",
+            placeholder="任意の回答を入力してください。",
             label_visibility="collapsed",
         )
         answers_meta.append((text, answer_key))
 
-    if st.button("回答をフォームに反映", use_container_width=True):
+    update_button = st.button("回答をフォームに反映", use_container_width=True)
+    if update_button:
         answered_pairs = []
         for question_text, answer_key in answers_meta:
             answer_text = str(st.session_state.get(answer_key, "") or "").strip()
@@ -259,13 +284,14 @@ if follow_up_questions and current_follow_up_round <= MAX_FOLLOW_UP_ROUNDS:
                 field: st.session_state.get(f"{field}_widget", "") or ""
                 for field, _, _ in FORM_FIELDS
             }
-            update_result = update_form_with_followups(
-                st.session_state.get("source_text", ""),
-                current_form_snapshot,
-                answered_pairs,
-                current_round=current_follow_up_round or 1,
-                max_rounds=MAX_FOLLOW_UP_ROUNDS,
-            )
+            with st.spinner("Geminiが回答内容を反映しています…"):
+                update_result = update_form_with_followups(
+                    st.session_state.get("source_text", ""),
+                    current_form_snapshot,
+                    answered_pairs,
+                    current_round=current_follow_up_round or 1,
+                    max_rounds=MAX_FOLLOW_UP_ROUNDS,
+                )
             updated_form = update_result.get("form", current_form_snapshot)
             cf_after = ContractForm(
                 **{field: (updated_form.get(field) or None) for field, _, _ in FORM_FIELDS}
@@ -297,9 +323,7 @@ if follow_up_questions and current_follow_up_round <= MAX_FOLLOW_UP_ROUNDS:
                     message = "回答内容をフォームに反映しました。次の確認項目をご確認ください。"
                 else:
                     if max_rounds_reached or next_round >= MAX_FOLLOW_UP_ROUNDS:
-                        message = (
-                            f"回答内容をフォームに反映しました。追加の確認は上限の{MAX_FOLLOW_UP_ROUNDS}ラウンドまでです。"
-                        )
+                        message = f"回答内容をフォームに反映しました。追加の確認は上限の{MAX_FOLLOW_UP_ROUNDS}ラウンドまでです。"
                     else:
                         message = "回答内容をフォームに反映しました。追加の確認はありません。"
                 st.session_state["follow_up_update_feedback"] = (
@@ -310,7 +334,10 @@ if follow_up_questions and current_follow_up_round <= MAX_FOLLOW_UP_ROUNDS:
             st.rerun()
 
 if follow_up_feedback_message:
-    if isinstance(follow_up_feedback_message, (list, tuple)) and len(follow_up_feedback_message) >= 2:
+    if (
+        isinstance(follow_up_feedback_message, (list, tuple))
+        and len(follow_up_feedback_message) >= 2
+    ):
         status, message = follow_up_feedback_message[0], follow_up_feedback_message[1]
     else:
         status, message = "info", str(follow_up_feedback_message)
